@@ -20,10 +20,10 @@ dependencies:
   google_maps_flutter: ^2.5.3
   flutter_staggered_animations: ^1.1.1
   shared_preferences: ^2.5.3
-  firebase_core: ^4.7.0
-  firebase_auth: ^6.4.0
-  cloud_firestore: ^6.3.0
-  firebase_storage: 13.3.0
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+  cloud_firestore: ^6.10.0
+  firebase_storage: ^13.6.0
   firebase_ai: ^3.11.0
   firebase_messaging: ^16.2.0
   device_preview: ^1.2.0
@@ -79,5 +79,7 @@ flutter:
 dependency_overrides:
   geolocator_android: 4.6.1
   image_cropper_platform_interface: 7.1.0
+
+
 
 
