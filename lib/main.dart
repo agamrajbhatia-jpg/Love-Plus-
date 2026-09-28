@@ -81,7 +81,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme),
-        pageTransitionsTheme: const PageTransitionsTheme(
+        pageTransitionsTheme: PageTransitionsTheme(
           builders: {
             TargetPlatform.android: CupertinoPageTransitionsBuilder(),
             TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
@@ -173,4 +173,5 @@ class _DataInitHandlerState extends State<_DataInitHandler> {
     return const Scaffold(body: RomanticLoadingOverlay(customMessage: "Loading your love story..."));
   }
 }
+
 
