@@ -1,0 +1,105 @@
+{
+  "project_info": {
+    "project_number": "446572633895",
+    "project_id": "love-plus-8b84d",
+    "storage_bucket": "love-plus-8b84d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:446572633895:android:8a346ed5574979daa99302",
+        "android_client_info": {
+          "package_name": "com.agam.loveplus"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "446572633895-hebvlgt9sbd1hn6lfr7ovfndd2l1fr6g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAA2sSwxKFTFXfo3p1it95xcrcpehiebg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "446572633895-h2to81e75ou6h9hnq914dphuskmkradg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:446572633895:android:4c64eb2b89f9a98ca99302",
+        "android_client_info": {
+          "package_name": "com.example.couple_app_backup"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "446572633895-icg70dju0rfbuo4p6ivbfuo6q9mkki8m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.couple_app_backup",
+            "certificate_hash": "2fa0931f2b394860c534ba7907c5da22b625f601"
+          }
+        },
+        {
+          "client_id": "446572633895-hebvlgt9sbd1hn6lfr7ovfndd2l1fr6g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAA2sSwxKFTFXfo3p1it95xcrcpehiebg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "446572633895-h2to81e75ou6h9hnq914dphuskmkradg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:446572633895:android:b34b10cb0ad4fa75a99302",
+        "android_client_info": {
+          "package_name": "loveplus.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "446572633895-hebvlgt9sbd1hn6lfr7ovfndd2l1fr6g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAA2sSwxKFTFXfo3p1it95xcrcpehiebg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "446572633895-h2to81e75ou6h9hnq914dphuskmkradg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "coupleapp-functions",
+  "version": "1.0.0",
+  "description": "Cloud Functions for CoupleApp Notifications",
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^11.11.0",
+    "firebase-functions": "^4.5.0"
+  },
+  "engines": {
+    "node": "18"
+  }
+}

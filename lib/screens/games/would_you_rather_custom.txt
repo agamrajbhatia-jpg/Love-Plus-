@@ -1,0 +1,25 @@
+  void _loadCustomQuestions() {
+    List<Map<String, String>> sliced = [];
+    for (String q in widget.customQuestions!) {
+      String stripped = q.replaceAll(RegExp(r'^would you rather\s+', caseSensitive: false), '').replaceAll('?', '');
+      List<String> parts = stripped.split(RegExp(r'\s+or\s+', caseSensitive: false));
+      
+      String optA = parts.isNotEmpty ? parts.first.trim() : "Option A";
+      if (optA.isNotEmpty) optA = optA[0].toUpperCase() + optA.substring(1);
+      
+      String optB = parts.length > 1 ? parts.sublist(1).join(' or ').trim() : "Option B";
+      if (optB.isNotEmpty) optB = optB[0].toUpperCase() + optB.substring(1);
+
+      sliced.add({
+        "question": q,
+        "optionA": optA,
+        "optionB": optB,
+      });
+    }
+    if (mounted) {
+      setState(() {
+        _questions = sliced;
+        _isLoading = false;
+      });
+    }
+  }

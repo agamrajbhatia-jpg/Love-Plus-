@@ -1,0 +1,36 @@
+                const SizedBox(height: 30),
+                _buildCustomGamesInbox(),
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: () async {
+                    final appState = context.read<AppState>();
+                    final coupleId = appState.currentCoupleId;
+                    final uid = appState.currentUid;
+                    if (coupleId != null && uid != null) {
+                      bool canCreate = await FirebaseGateService.checkCustomCreationAccess(coupleId, uid);
+                      if (canCreate) {
+                        _showCreateBottomSheet();
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const PremiumBenefitsScreen()));
+                      }
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(30),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFF00F0FF), Color(0xFFFF2E93)]),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: const [BoxShadow(color: Color(0x66FF2E93), blurRadius: 15, spreadRadius: 2)],
+                    ),
+                    child: Center(
+                      child: Text(
+                        "Create Your Own ?",
+                        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                ElevatedButton(
