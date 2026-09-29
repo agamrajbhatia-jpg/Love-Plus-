@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:confetti/confetti.dart';
 
@@ -294,3 +294,4 @@ class _ReactionDuelScreenState extends State<ReactionDuelScreen> {
     );
   }
 }
+

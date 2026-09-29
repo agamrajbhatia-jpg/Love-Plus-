@@ -59,3 +59,4 @@ class WebImage {
   final Uint8List bytes;
   WebImage(this.url, this.bytes);
 }
+

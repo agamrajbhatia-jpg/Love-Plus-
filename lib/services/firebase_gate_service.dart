@@ -172,3 +172,4 @@ class FirebaseGateService {
     return coupleId.hashCode ^ day ^ maxPlayCount;
   }
 }
+

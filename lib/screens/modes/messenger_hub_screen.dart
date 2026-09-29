@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1169,5 +1169,6 @@ class _BackgroundPainter extends CustomPainter {
   @override
   bool shouldRepaint(_BackgroundPainter oldDelegate) => time != oldDelegate.time || theme != oldDelegate.theme;
 }
+
 
 

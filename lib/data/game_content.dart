@@ -526,3 +526,4 @@ const Map<String, List<String>> dateIdeasCategories = {
     'Helicopter Tour at Night', 'Private Boat Charter', 'Couples Massage', 'Speakeasy Bar Hopping', 'Art Gallery Opening'
   ],
 };
+

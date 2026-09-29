@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math';
 // ignore_for_file: avoid_web_libraries_in_flutter
@@ -224,3 +224,4 @@ class Particle {
 
   Particle({required this.angle, required this.speed, required this.size, required this.color});
 }
+

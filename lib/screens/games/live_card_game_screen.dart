@@ -1,8 +1,8 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -326,13 +326,13 @@ class _LiveCardGameScreenState extends State<LiveCardGameScreen> with SingleTick
                         builder: (context, opacity, child) {
                           return Opacity(
                             opacity: opacity,
-                            child: const Text("✨", style: TextStyle(fontSize: 48)),
+                            child: const Text("?", style: TextStyle(fontSize: 48)),
                           );
                         },
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        "✨ Chapter Complete",
+                        "? Chapter Complete",
                         textAlign: TextAlign.center,
                         style: GoogleFonts.playfairDisplay(
                           fontSize: 24,
@@ -425,7 +425,7 @@ class _LiveCardGameScreenState extends State<LiveCardGameScreen> with SingleTick
                                   ],
                                 ),
                                 child: Text(
-                                  "✨ Open New Deck ✨",
+                                  "? Open New Deck ?",
                                   style: GoogleFonts.poppins(
                                     fontSize: 16,
                                     color: Colors.white,
@@ -448,7 +448,7 @@ class _LiveCardGameScreenState extends State<LiveCardGameScreen> with SingleTick
                             ],
                           ),
                           child: Text(
-                            "✨ New Deck Unlocks In: $minutes:$seconds",
+                            "? New Deck Unlocks In: $minutes:$seconds",
                             style: GoogleFonts.poppins(
                               fontSize: 14,
                               color: Colors.white,
@@ -615,7 +615,7 @@ class _LiveCardGameScreenState extends State<LiveCardGameScreen> with SingleTick
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            "Share this deck with your partner or play on call together ❤️",
+                            "Share this deck with your partner or play on call together ??",
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.white.withOpacity(0.85),
@@ -667,7 +667,7 @@ class _LiveCardGameScreenState extends State<LiveCardGameScreen> with SingleTick
                                         ),
                                         const SizedBox(height: 16),
                                         Text(
-                                          'Come back tomorrow for new cards! ⏳',
+                                          'Come back tomorrow for new cards! ?',
                                           style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70),
                                           textAlign: TextAlign.center,
                                         ),
@@ -805,5 +805,6 @@ class _GameCardWidget extends StatelessWidget {
     );
   }
 }
+
 
 

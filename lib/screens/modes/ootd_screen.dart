@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'photo_studio_modal.dart';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -847,6 +847,7 @@ class _FloatingEmoji {
   
   _FloatingEmoji({required this.emoji, required this.controller, required this.startX});
 }
+
 
 
 

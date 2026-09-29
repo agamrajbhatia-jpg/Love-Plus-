@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 // --- Midnight Love Letter (Deep & Passionate) ---
 class MidnightLoveLetterBackground extends StatefulWidget {
@@ -404,3 +404,4 @@ class _AnimatedBubblePopState extends State<AnimatedBubblePop> with SingleTicker
     );
   }
 }
+

@@ -58,3 +58,4 @@ class DefaultFirebaseOptions {
     measurementId: 'REPLACE_ME',
   );
 }
+
