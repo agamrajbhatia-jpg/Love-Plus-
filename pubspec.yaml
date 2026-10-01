@@ -1,7 +1,7 @@
 name: couple_app
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: ^3.4.0
@@ -63,6 +63,8 @@ flutter_launcher_icons:
   image_path: "assets/logo.png"
 
 flutter:
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   assets:
     - assets/idle.gif
@@ -81,6 +83,9 @@ flutter:
 dependency_overrides:
   geolocator_android: 4.6.1
   image_cropper_platform_interface: 7.1.0
+
+
+
 
 
 
