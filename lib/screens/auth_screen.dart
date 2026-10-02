@@ -244,22 +244,22 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                           textAlign: TextAlign.center,
                         ),
-                      ),
-                        
-                      const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Expanded(child: Divider(color: Colors.white.withOpacity(0.2), thickness: 1)),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text('OR', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
+                      ),                        // TODO: Re-enable Google Sign-In after App Store approval
+                        if (false) ...[
+                          const SizedBox(height: 32),
+                          Row(
+                            children: [
+                              Expanded(child: Divider(color: Colors.white.withOpacity(0.2), thickness: 1)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Text('OR', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
+                              ),
+                              Expanded(child: Divider(color: Colors.white.withOpacity(0.2), thickness: 1)),
+                            ],
                           ),
-                          Expanded(child: Divider(color: Colors.white.withOpacity(0.2), thickness: 1)),
+                          const SizedBox(height: 24),
+                          _buildGoogleButton(),
                         ],
-                      ),
-                      const SizedBox(height: 24),
-                      
-                      _buildGoogleButton(),
                     ],
                   ),
                 ),
@@ -362,4 +362,6 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 }
+
+
 
