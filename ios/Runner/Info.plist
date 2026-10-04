@@ -48,13 +48,14 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs access to location when open to show your partner where you are.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs access to location when in the background.</string>
+	<string>Love Plus uses your background location to continuously update your distance from your partner on the shared tracking map, even when the app is closed.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>This app needs access to location when in the background.</string>
+	<string>Love Plus uses your background location to continuously update your distance from your partner on the shared tracking map, even when the app is closed.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to the camera to take OOTD photos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to the photo library to upload OOTD photos.</string>
 </dict>
 </plist>
+
 
