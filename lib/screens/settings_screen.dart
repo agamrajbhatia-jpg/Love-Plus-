@@ -409,7 +409,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onTap: () async {
                                   final Uri url = Uri.parse('https://play.google.com/store/apps/details?id=com.agam.loveplus');
                                   if (!await launchUrl(url)) {
-                                    debugPrint('Could not launch \');
+                                    debugPrint('Could not launch URL');
                                   }
                                 }
                               ),
@@ -506,6 +506,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
 
 
 
