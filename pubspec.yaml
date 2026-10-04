@@ -1,12 +1,13 @@
 name: couple_app
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.0+7
+version: 1.0.0+8
 
 environment:
   sdk: ^3.4.0
 
 dependencies:
+  share_plus: ^10.1.0
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
@@ -52,6 +53,7 @@ dependencies:
 
 
 dev_dependencies:
+  share_plus: ^10.1.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
@@ -83,6 +85,7 @@ flutter:
 dependency_overrides:
   geolocator_android: 4.6.1
   image_cropper_platform_interface: 7.1.0
+
 
 
 

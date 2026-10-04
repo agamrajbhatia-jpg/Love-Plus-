@@ -18,6 +18,7 @@ import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/auth_screen.dart';
+import 'screens/welcome_screen.dart';
 import 'services/notification_service.dart';
 
 void main() async {
@@ -54,6 +55,9 @@ void main() async {
     debugPrint("RevenueCat init error: $e");
   }
 
+  final prefs = await SharedPreferences.getInstance();
+  final hasSeenWelcome = prefs.getBool('has_seen_welcome') ?? false;
+
   runApp(
     DevicePreview(
       enabled: false,
@@ -61,14 +65,15 @@ void main() async {
         providers: [
           ChangeNotifierProvider(create: (_) => AppState()),
         ],
-        child: const MyApp(),
+        child: MyApp(hasSeenWelcome: hasSeenWelcome),
       ),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool hasSeenWelcome;
+  const MyApp({super.key, required this.hasSeenWelcome});
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +99,7 @@ class MyApp extends StatelessWidget {
       ),
       builder: DevicePreview.appBuilder,
       locale: DevicePreview.locale(context),
-      home: const RootScreen(),
+      home: hasSeenWelcome ? const RootScreen() : const WelcomeScreen(),
     );
   }
 }
@@ -174,6 +179,7 @@ class _DataInitHandlerState extends State<_DataInitHandler> {
     return const Scaffold(body: RomanticLoadingOverlay(customMessage: "Loading your love story..."));
   }
 }
+
 
 
 

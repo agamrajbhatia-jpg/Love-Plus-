@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/app_state.dart';
 import '../main.dart';
 import 'premium_benefits_screen.dart';
@@ -400,6 +402,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   _showGlassModal('Help & Support', 'Welcome to the Help Center.\n\nIf you have any issues with pairing, syncing, or missing data, please ensure both partners are on the latest version of the app and have stable internet connections.\n\nFor further assistance, reach out to our support team at support@coupleapp.com.');
                                 }
                               ),
+                              const SizedBox(height: 8),
+                              _buildSettingTile(
+                                icon: Icons.star, 
+                                title: 'Rate Love Plus', 
+                                onTap: () async {
+                                  final Uri url = Uri.parse('https://play.google.com/store/apps/details?id=com.agam.loveplus');
+                                  if (!await launchUrl(url)) {
+                                    debugPrint('Could not launch \');
+                                  }
+                                }
+                              ),
+                              const SizedBox(height: 8),
+                              _buildSettingTile(
+                                icon: Icons.share, 
+                                title: 'Share Love Plus', 
+                                onTap: () {
+                                  Share.share('Join me on Love Plus! Connect with me here: https://play.google.com/store/apps/details?id=com.agam.loveplus');
+                                }
+                              ),
                             ]
                           )
                         )
@@ -485,5 +506,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
 
 
