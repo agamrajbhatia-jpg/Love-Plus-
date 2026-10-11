@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:math';
@@ -341,4 +341,5 @@ class _CoupleQuizScreenState extends State<CoupleQuizScreen> {
     );
   }
 }
+
 

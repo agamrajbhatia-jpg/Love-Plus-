@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:math';
@@ -195,3 +195,4 @@ class _FloatingHeart {
     x += sin(DateTime.now().millisecondsSinceEpoch / 1000.0 + speed) * 0.5;
   }
 }
+

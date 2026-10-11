@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -805,6 +805,7 @@ class _GameCardWidget extends StatelessWidget {
     );
   }
 }
+
 
 
 

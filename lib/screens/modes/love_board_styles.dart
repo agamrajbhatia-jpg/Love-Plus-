@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 
 class LoveBoardStyle {
   final String name;
@@ -94,4 +94,5 @@ final List<LoveBoardStyle> loveBoardStyles = [
     textColor: const Color(0xFF5C4033),
   ),
 ];
+
 

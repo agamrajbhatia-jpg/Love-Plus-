@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:math';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,6 +16,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/app_state.dart';
 import '../../theme/map_style.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LocationScreen extends StatefulWidget {
   const LocationScreen({super.key});
@@ -42,9 +43,12 @@ class _LocationScreenState extends State<LocationScreen> {
   String _timeText = "Last updated: Just now";
   static final Map<String, Uint8List> _networkImageCache = {};
 
-  bool _showDistanceCard = false;
+  int _partnerBattery = 84;
+  String _partnerTemp = "22°C";
+  String _partnerWeather = "Sunny";
+  int _partnerAqi = 32;
+
   bool _hasInitialLocation = false;
-  bool _isMapInitialized = false;
   bool _hasPartnerLocation = false;
 
   @override
@@ -104,6 +108,10 @@ class _LocationScreenState extends State<LocationScreen> {
       newPartnerLoc = LatLng(pData['lat'], pData['lng']);
       _partnerCity = pData['city'] ?? "Unknown Area";
       _lastUpdated = (pData['timestamp'] as Timestamp?)?.toDate();
+      _partnerBattery = (pData['battery'] as num?)?.toInt() ?? 84;
+      _partnerWeather = pData['weather'] as String? ?? "Sunny";
+      _partnerTemp = pData['temp'] as String? ?? "22°C";
+      _partnerAqi = (pData['aqi'] as num?)?.toInt() ?? 32;
     }
     
     if (foundPartner) {
@@ -111,14 +119,14 @@ class _LocationScreenState extends State<LocationScreen> {
         newMyLoc.latitude, newMyLoc.longitude,
         newPartnerLoc.latitude, newPartnerLoc.longitude,
       );
-      final double miles = distanceInMeters / 1609.34;
       if (distanceInMeters < 1000) {
-        _distanceText = "In the same area!";
+        _distanceText = "${distanceInMeters.round()} m apart";
       } else {
-        _distanceText = "\ miles apart";
+        final double miles = distanceInMeters / 1609.34;
+        _distanceText = "${miles.toStringAsFixed(1)} mi apart";
       }
     } else {
-      _distanceText = "Connect partner to view live distance";
+      _distanceText = "Waiting for partner...";
     }
     
     if (_lastUpdated != null) {
@@ -493,6 +501,50 @@ class _LocationScreenState extends State<LocationScreen> {
     }
   }
 
+  Future<void> _launchDirections() async {
+    if (!_hasPartnerLocation || (_partnerLoc.latitude == 0 && _partnerLoc.longitude == 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Partner location is not available yet.")),
+      );
+      return;
+    }
+    final lat = _partnerLoc.latitude;
+    final lng = _partnerLoc.longitude;
+    final Uri nativeUri = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
+    final Uri webUri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+
+    try {
+      if (await canLaunchUrl(nativeUri)) {
+        await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(webUri);
+      }
+    } catch (e) {
+      debugPrint("Could not launch maps: $e");
+      try {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
+  }
+
+  IconData _getWeatherIcon(String weather) {
+    final lower = weather.toLowerCase();
+    if (lower.contains('rain')) return Icons.water_drop_rounded;
+    if (lower.contains('cloud')) return Icons.cloud_rounded;
+    if (lower.contains('snow')) return Icons.ac_unit_rounded;
+    if (lower.contains('thunder')) return Icons.flash_on_rounded;
+    return Icons.wb_sunny_rounded;
+  }
+
+  Color _getAqiColor(int aqi) {
+    if (aqi <= 50) return const Color(0xFF32D74B);
+    if (aqi <= 100) return const Color(0xFFFFD60A);
+    if (aqi <= 150) return const Color(0xFFFF9F0A);
+    return const Color(0xFFFF453A);
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -501,227 +553,273 @@ class _LocationScreenState extends State<LocationScreen> {
       backgroundColor: const Color(0xFF090A0F),
       body: Stack(
         children: [
+          // Full Screen Google Map
           if (_hasInitialLocation)
-            GoogleMap(
-              onMapCreated: (controller) {
-                _mapController = controller;
-                _mapController!.setMapStyle(darkMapStyle);
-                _isMapInitialized = true;
-                _recenterCamera();
-              },
-              mapType: _currentMapType,
-              tiltGesturesEnabled: true,
-              rotateGesturesEnabled: true,
-              onTap: (_) {
-                if (_showDistanceCard) setState(() => _showDistanceCard = false);
-              },
-              onCameraMove: (CameraPosition position) {
-                if (position.zoom >= 16.0 && _currentMapType != MapType.hybrid) {
-                  setState(() => _currentMapType = MapType.hybrid);
-                } else if (position.zoom < 16.0 && _currentMapType != MapType.normal) {
-                  setState(() => _currentMapType = MapType.normal);
-                }
-              },
-              initialCameraPosition: CameraPosition(target: _myLoc, zoom: 15.5, tilt: 45),
-              padding: const EdgeInsets.only(bottom: 120),
-              myLocationEnabled: false,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              compassEnabled: false,
-              mapToolbarEnabled: false,
-              markers: {
-                Marker(
-                  markerId: const MarkerId('me'),
-                  position: _myLoc,
-                  icon: _myMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
-                  zIndex: 2,
-                  onTap: () {
-                    setState(() => _showDistanceCard = true);
-                    _mapController?.animateCamera(
-                      CameraUpdate.newCameraPosition(
-                        CameraPosition(target: _myLoc, zoom: 16.5, tilt: 60.0)
-                      )
-                    );
-                    // Open avatar selection after a slight delay
-                    Future.delayed(const Duration(milliseconds: 500), _showAvatarPicker);
-                  },
-                ),
-                if (_hasPartnerLocation)
+            Positioned.fill(
+              child: GoogleMap(
+                onMapCreated: (controller) {
+                  _mapController = controller;
+                  _mapController!.setMapStyle(darkMapStyle);
+                  _recenterCamera();
+                },
+                mapType: _currentMapType,
+                tiltGesturesEnabled: true,
+                rotateGesturesEnabled: true,
+                onTap: (_) {},
+                onCameraMove: (CameraPosition position) {
+                  if (position.zoom >= 16.0 && _currentMapType != MapType.hybrid) {
+                    setState(() => _currentMapType = MapType.hybrid);
+                  } else if (position.zoom < 16.0 && _currentMapType != MapType.normal) {
+                    setState(() => _currentMapType = MapType.normal);
+                  }
+                },
+                initialCameraPosition: CameraPosition(target: _myLoc, zoom: 15.5, tilt: 45),
+                padding: const EdgeInsets.only(top: 90, bottom: 20),
+                myLocationEnabled: false,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                compassEnabled: false,
+                mapToolbarEnabled: false,
+                markers: {
                   Marker(
-                    markerId: const MarkerId('partner'),
-                    position: _partnerLoc,
-                    icon: _partnerMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
-                    zIndex: 1,
+                    markerId: const MarkerId('me'),
+                    position: _myLoc,
+                    icon: _myMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+                    zIndex: 2,
                     onTap: () {
-                      setState(() => _showDistanceCard = true);
                       _mapController?.animateCamera(
                         CameraUpdate.newCameraPosition(
-                          CameraPosition(target: _partnerLoc, zoom: 16.5, tilt: 60.0)
-                        )
+                          CameraPosition(target: _myLoc, zoom: 16.5, tilt: 60.0),
+                        ),
                       );
+                      Future.delayed(const Duration(milliseconds: 400), _showAvatarPicker);
                     },
                   ),
-              },
+                  if (_hasPartnerLocation)
+                    Marker(
+                      markerId: const MarkerId('partner'),
+                      position: _partnerLoc,
+                      icon: _partnerMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
+                      zIndex: 1,
+                      onTap: () {
+                        _mapController?.animateCamera(
+                          CameraUpdate.newCameraPosition(
+                            CameraPosition(target: _partnerLoc, zoom: 16.5, tilt: 60.0),
+                          ),
+                        );
+                      },
+                    ),
+                },
+              ),
             )
           else
             const Center(child: CircularProgressIndicator(color: Color(0xFF00FFFF))),
 
+          // Floating Frosted Glass Status HUD at the Top
           if (_hasInitialLocation)
             Positioned(
-              bottom: 110,
-              left: 16,
-              right: 16,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                transitionBuilder: (child, animation) {
-                  return SlideTransition(
-                    position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutBack)),
-                    child: FadeTransition(opacity: animation, child: child),
-                  );
-                },
-                child: _showDistanceCard
-                  ? _PartnerStatusHud(
-                      key: const ValueKey('full_card'),
-                      distanceText: _distanceText,
-                      myCity: _myCity,
-                      partnerCity: _hasPartnerLocation ? _partnerCity : 'Waiting...',
-                      timeText: _timeText,
-                      partnerName: appState.partnerName ?? 'Partner',
-                      onClose: () => setState(() => _showDistanceCard = false),
-                    )
-                  : GestureDetector(
-                      key: const ValueKey('capsule'),
-                      onTap: () => setState(() => _showDistanceCard = true),
-                      child: Center(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(30),
-                          child: BackdropFilter(
-                            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0x1AFFFFFF),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(color: Colors.white24, width: 1),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.radar, color: Color(0xFFE11D48), size: 18),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Text(
-                                      _distanceText,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+              top: 10,
+              left: 14,
+              right: 14,
+              child: SafeArea(
+                child: _buildTopStatusHud(appState),
               ),
-            )
+            ),
+
+          // Floating Action Buttons for quick Map Navigation and Avatar
+          if (_hasInitialLocation)
+            Positioned(
+              bottom: 24,
+              right: 16,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FloatingActionButton.small(
+                    heroTag: 'recenter_map',
+                    backgroundColor: const Color(0xDD0D0F17),
+                    foregroundColor: const Color(0xFF00F0FF),
+                    elevation: 4,
+                    onPressed: _recenterCamera,
+                    child: const Icon(Icons.my_location_rounded, size: 20),
+                  ),
+                  const SizedBox(height: 10),
+                  FloatingActionButton.small(
+                    heroTag: 'change_avatar',
+                    backgroundColor: const Color(0xFFFF2E93),
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                    onPressed: _showAvatarPicker,
+                    child: const Icon(Icons.face_retouching_natural_rounded, size: 20),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
   }
-}
 
-class _PartnerStatusHud extends StatelessWidget {
-  final String distanceText;
-  final String myCity;
-  final String partnerCity;
-  final String timeText;
-  final String partnerName;
-  final VoidCallback onClose;
-  
-  const _PartnerStatusHud({
-    super.key,
-    required this.distanceText,
-    required this.myCity,
-    required this.partnerCity,
-    required this.timeText,
-    required this.partnerName,
-    required this.onClose,
-  });
+  Widget _buildTopStatusHud(AppState appState) {
+    final batteryColor = _partnerBattery <= 20
+        ? const Color(0xFFFF453A)
+        : (_partnerBattery <= 40 ? const Color(0xFFFF9F0A) : const Color(0xFF32D74B));
 
-  @override
-  Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(22),
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: const Color(0x22000000),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white12, width: 1.5),
+            color: const Color(0xD90D0F1A),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 20,
-                spreadRadius: 2,
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 18,
+                offset: const Offset(0, 4),
               )
             ],
           ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
+              // Heart Icon Badge
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFF2E93).withOpacity(0.2),
+                ),
+                child: const Icon(Icons.favorite_rounded, color: Color(0xFFFF2E93), size: 15),
+              ),
+              const SizedBox(width: 8),
+
+              // Metrics Row: Distance, Weather, AQI, Battery
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // a) Real-time Distance
+                      _buildHudMetric(
+                        icon: Icons.near_me_rounded,
+                        iconColor: const Color(0xFF00F0FF),
+                        label: _hasPartnerLocation ? _distanceText : "Locating...",
+                      ),
+                      _buildHudDivider(),
+
+                      // b) Weather
+                      _buildHudMetric(
+                        icon: _getWeatherIcon(_partnerWeather),
+                        iconColor: const Color(0xFFFFB800),
+                        label: _partnerTemp,
+                      ),
+                      _buildHudDivider(),
+
+                      // c) Air Quality Index (AQI)
+                      _buildHudMetric(
+                        icon: Icons.air_rounded,
+                        iconColor: _getAqiColor(_partnerAqi),
+                        label: "AQI $_partnerAqi",
+                      ),
+                      _buildHudDivider(),
+
+                      // d) Battery Percentage
+                      _buildHudMetric(
+                        icon: _partnerBattery <= 20
+                            ? Icons.battery_alert_rounded
+                            : (_partnerBattery <= 50 ? Icons.battery_3_bar_rounded : Icons.battery_full_rounded),
+                        iconColor: batteryColor,
+                        label: "$_partnerBattery%",
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Directions Action Button CTA
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _launchDirections,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF2E93), Color(0xFF00F0FF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF2E93).withOpacity(0.35),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        )
+                      ],
+                    ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(color: const Color(0xFFE11D48).withOpacity(0.2), shape: BoxShape.circle),
-                          child: const Icon(Icons.favorite, color: Color(0xFFE11D48), size: 16),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(partnerName, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                        const Icon(Icons.directions_rounded, color: Colors.white, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Directions',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: onClose,
-                    child: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white54, size: 28),
-                  )
-                ],
+                ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Icon(Icons.location_on, color: Color(0xFF00FFFF), size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(partnerCity, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13), overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.social_distance, color: Colors.white54, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(distanceText, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13), overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(timeText, style: GoogleFonts.poppins(color: Colors.white38, fontSize: 12), overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildHudMetric({required IconData icon, required Color iconColor, required String label}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: iconColor, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHudDivider() {
+    return Container(
+      height: 12,
+      width: 1,
+      color: Colors.white24,
+      margin: const EdgeInsets.symmetric(horizontal: 3),
+    );
+  }
 }
+
 

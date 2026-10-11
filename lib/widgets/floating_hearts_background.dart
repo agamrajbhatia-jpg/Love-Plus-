@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 
 class FloatingHeartsBackground extends StatefulWidget {
   final Widget child;
@@ -138,4 +138,5 @@ class _HeartsPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _HeartsPainter oldDelegate) => true;
 }
+
 

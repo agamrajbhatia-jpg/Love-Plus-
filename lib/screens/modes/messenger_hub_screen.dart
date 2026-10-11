@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,6 +11,7 @@ import 'package:record/record.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:intl/intl.dart';
 
 import '../../providers/app_state.dart';
 
@@ -210,22 +211,7 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
                       itemCount: appState.messages.length,
                       itemBuilder: (context, index) {
                         final msg = appState.messages[index];
-                        final isLastUserMessage = msg.isUser && index == appState.messages.indexWhere((m) => m.isUser);
-                        
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildMessageItem(context, msg, theme, appState),
-                            if (isLastUserMessage)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 12.0, right: 8.0, top: 4.0),
-                                child: (appState.readReceiptsEnabled && msg.isRead)
-                                    ? Text('Seen \u2713\u2713', textAlign: TextAlign.right, style: GoogleFonts.poppins(color: Colors.blueAccent, fontSize: 11, fontWeight: FontWeight.bold, shadows: [const Shadow(color: Colors.blueAccent, blurRadius: 8)]))
-                                    : Text('Delivered \u2713', textAlign: TextAlign.right, style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.6), fontSize: 11)),
-                              ),
-                            const SizedBox(height: 12),
-                          ],
-                        );
+                        return Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildMessageItem(context, msg, theme, appState));
                       },
                     ),
                   ),
@@ -368,6 +354,7 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
   }
 
   Widget _buildStyledBubble(ChatMessage msg, ChatTheme theme, bool useDarkText) {
+    final timeString = DateFormat('h:mm a').format(msg.timestamp);
     Widget content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -437,51 +424,85 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
         else if (msg.type == 'secret_ink')
           _SecretInkBubble(text: msg.text, useDarkText: useDarkText)
         else
-          Text(msg.text, style: GoogleFonts.poppins(color: msg.isUser ? theme.userTextColor : theme.partnerTextColor, fontSize: 15, fontWeight: FontWeight.w400)),
+          Text(
+            msg.text,
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text(
+              timeString,
+              style: GoogleFonts.poppins(
+                color: msg.isUser ? Colors.white.withOpacity(0.7) : Colors.white54,
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            if (msg.isUser) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.done_all_rounded,
+                size: 14,
+                color: msg.isRead ? const Color(0xFF00F0FF) : Colors.white60,
+              ),
+            ],
+          ],
+        ),
       ],
     );
 
+    final bubbleRadius = BorderRadius.only(
+      topLeft: const Radius.circular(20),
+      topRight: const Radius.circular(20),
+      bottomLeft: msg.isUser ? const Radius.circular(20) : const Radius.circular(4),
+      bottomRight: msg.isUser ? const Radius.circular(4) : const Radius.circular(20),
+    );
+
     return Container(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(24),
-          topRight: const Radius.circular(24),
-          bottomLeft: msg.isUser ? const Radius.circular(24) : const Radius.circular(6),
-          bottomRight: msg.isUser ? const Radius.circular(6) : const Radius.circular(24),
-        ),
-        gradient: LinearGradient(
-          colors: msg.isUser 
-              ? theme.userBubbleColors
-              : theme.partnerBubbleColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        borderRadius: bubbleRadius,
+        gradient: msg.isUser 
+            ? const LinearGradient(
+                colors: [Color(0xFFFF2E93), Color(0xFFFF6584)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: msg.isUser ? null : const Color(0x22FFFFFF),
         border: Border.all(
-          color: msg.isUser ? Colors.transparent : (theme.partnerBorderColor ?? Colors.transparent),
+          color: Colors.white.withOpacity(0.18),
           width: 1.0,
         ),
         boxShadow: msg.isUser ? [
           BoxShadow(
-            color: theme.userShadowColor.withOpacity(0.35),
+            color: const Color(0xFFFF2E93).withOpacity(0.35),
             blurRadius: 16,
             spreadRadius: -2,
             offset: const Offset(0, 4),
           )
-        ] : [],
+        ] : [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 12,
+          )
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(24),
-          topRight: const Radius.circular(24),
-          bottomLeft: msg.isUser ? const Radius.circular(24) : const Radius.circular(6),
-          bottomRight: msg.isUser ? const Radius.circular(6) : const Radius.circular(24),
-        ),
+        borderRadius: bubbleRadius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: msg.type == 'image' ? 4 : 18, 
-              vertical: msg.type == 'image' ? 4 : 12
+              horizontal: msg.type == 'image' ? 6 : 16, 
+              vertical: msg.type == 'image' ? 6 : 10,
             ),
             child: content,
           ),
@@ -1169,6 +1190,9 @@ class _BackgroundPainter extends CustomPainter {
   @override
   bool shouldRepaint(_BackgroundPainter oldDelegate) => time != oldDelegate.time || theme != oldDelegate.theme;
 }
+
+
+
 
 
 

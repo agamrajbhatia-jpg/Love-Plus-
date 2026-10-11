@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
 class GameSkeletonLoader extends StatelessWidget {
@@ -65,4 +65,5 @@ class GameSkeletonLoader extends StatelessWidget {
     );
   }
 }
+
 

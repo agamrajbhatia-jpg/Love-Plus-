@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
@@ -225,4 +225,5 @@ class _LoveBoardCardState extends State<_LoveBoardCard> {
     );
   }
 }
+
 

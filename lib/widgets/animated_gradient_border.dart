@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 
 class AnimatedGradientBorder extends StatefulWidget {
   final Widget child;
@@ -88,4 +88,5 @@ class _AnimatedGradientBorderState extends State<AnimatedGradientBorder> with Si
     );
   }
 }
+
 
