@@ -52,18 +52,28 @@ class NotificationService {
       sound: true,
     );
 
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'couple_app_channel',
-      'Couple App Notifications',
-      description: 'High priority notifications for Couple App',
+    const AndroidNotificationChannel loveplusChannel = AndroidNotificationChannel(
+      'loveplus_alerts',
+      'Love Plus Alerts',
+      description: 'High priority notifications for Love Plus',
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
     );
 
-    await _localNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+    const AndroidNotificationChannel legacyChannel = AndroidNotificationChannel(
+      'couple_app_channel',
+      'Couple App Notifications',
+      description: 'Legacy channel for Couple App',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    final androidPlugin = _localNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(loveplusChannel);
+    await androidPlugin?.createNotificationChannel(legacyChannel);
   }
 
   static Future<void> syncFCMToken() async {
@@ -102,16 +112,15 @@ class NotificationService {
 
   static Future<void> _showNotification(RemoteMessage message) async {
     RemoteNotification? notification = message.notification;
-    AndroidNotification? android = message.notification?.android;
 
     String title = notification?.title ?? message.data['title'] ?? 'New Notification';
     String body = notification?.body ?? message.data['body'] ?? '';
 
     if (title.isNotEmpty || body.isNotEmpty) {
       const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-        'couple_app_channel',
-        'Couple App Notifications',
-        channelDescription: 'High priority notifications for Couple App',
+        'loveplus_alerts',
+        'Love Plus Alerts',
+        channelDescription: 'High priority notifications for Love Plus',
         importance: Importance.max,
         priority: Priority.high,
         icon: '@mipmap/launcher_icon',
@@ -133,9 +142,9 @@ class NotificationService {
 
   static Future<void> sendLocalNotification(String title, String body) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'couple_app_channel',
-      'Couple App Notifications',
-      channelDescription: 'High priority notifications for Couple App',
+      'loveplus_alerts',
+      'Love Plus Alerts',
+      channelDescription: 'High priority notifications for Love Plus',
       importance: Importance.max,
       priority: Priority.high,
       icon: '@mipmap/launcher_icon',
@@ -152,6 +161,69 @@ class NotificationService {
     );
   }
 
+  static Future<void> dispatchPushNotification({
+    required String? coupleId,
+    required String? partnerUid,
+    required String title,
+    required String body,
+    required String type, // 'chat' | 'ootd' | 'memo'
+    String? chatId,
+  }) async {
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    if (myUid == null) return;
+
+    try {
+      String? targetPartnerUid = partnerUid;
+      if (targetPartnerUid == null && coupleId != null) {
+        final coupleDoc = await FirebaseFirestore.instance.collection('couples').doc(coupleId).get();
+        if (coupleDoc.exists) {
+          final cData = coupleDoc.data()!;
+          targetPartnerUid = cData['user1'] == myUid ? cData['user2'] : cData['user1'];
+        }
+      }
+
+      if (targetPartnerUid == null) return;
+
+      final partnerDoc = await FirebaseFirestore.instance.collection('users').doc(targetPartnerUid).get();
+      final partnerData = partnerDoc.data();
+      final String? partnerFcmToken = partnerData?['fcmToken'];
+
+      final Map<String, dynamic> payload = {
+        'toToken': partnerFcmToken,
+        'recipientUid': targetPartnerUid,
+        'senderId': myUid,
+        'coupleId': coupleId ?? chatId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'notification': {
+          'title': title,
+          'body': body,
+          'sound': 'default',
+        },
+        'data': {
+          'type': type,
+          'chatId': chatId ?? coupleId ?? '',
+          'senderId': myUid,
+        },
+      };
+
+      if (coupleId != null) {
+        await FirebaseFirestore.instance
+            .collection('couples')
+            .doc(coupleId)
+            .collection('notifications')
+            .add(payload);
+      }
+
+      await FirebaseFirestore.instance
+          .collection('notifications_queue')
+          .add(payload);
+
+      debugPrint("Dispatched push notification ($type) to partner $targetPartnerUid");
+    } catch (e) {
+      debugPrint("Error dispatching push notification: $e");
+    }
+  }
+
   static Future<void> scheduleNotification({
     required int id,
     required String title,
@@ -159,9 +231,9 @@ class NotificationService {
     required Duration delay,
   }) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'couple_app_channel',
-      'Couple App Notifications',
-      channelDescription: 'High priority notifications for Couple App',
+      'loveplus_alerts',
+      'Love Plus Alerts',
+      channelDescription: 'High priority notifications for Love Plus',
       importance: Importance.max,
       priority: Priority.high,
       icon: '@mipmap/launcher_icon',

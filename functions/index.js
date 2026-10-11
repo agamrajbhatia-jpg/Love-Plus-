@@ -64,10 +64,28 @@ exports.onNewMessage = functions.firestore
       body = data.text && data.text.length > 50 ? data.text.substring(0, 50) + '...' : (data.text || '');
     }
 
+    let msgType = 'chat';
+    if (senderId === 'system' || data.type === 'love_board_post') {
+      msgType = 'memo';
+    }
+
     const payload = {
       notification: {
         title: title,
         body: body,
+        sound: 'default',
+      },
+      data: {
+        type: msgType,
+        chatId: coupleId,
+        senderId: actualSenderId,
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'loveplus_alerts',
+          sound: 'default',
+        }
       }
     };
 
@@ -116,6 +134,19 @@ exports.onNewOotd = functions.firestore
       notification: {
         title: '👕 New Outfit of the Day!',
         body: `${senderName} just posted their OOTD. Tap to check it out!`,
+        sound: 'default',
+      },
+      data: {
+        type: 'ootd',
+        chatId: coupleId,
+        senderId: senderId,
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'loveplus_alerts',
+          sound: 'default',
+        }
       }
     };
 
@@ -123,6 +154,40 @@ exports.onNewOotd = functions.firestore
       await admin.messaging().sendToDevice(fcmToken, payload);
     } catch (e) {
       console.error('Error sending OOTD notification:', e);
+    }
+    return null;
+  });
+
+exports.onNotificationQueue = functions.firestore
+  .document('notifications_queue/{id}')
+  .onCreate(async (snap) => {
+    const data = snap.data();
+    if (!data || !data.toToken) return null;
+
+    const payload = {
+      notification: {
+        title: data.notification?.title || data.title || 'Love Plus Alert',
+        body: data.notification?.body || data.body || '',
+        sound: 'default',
+      },
+      data: {
+        type: String(data.data?.type || data.type || 'chat'),
+        chatId: String(data.data?.chatId || data.coupleId || ''),
+        senderId: String(data.data?.senderId || data.senderId || ''),
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'loveplus_alerts',
+          sound: 'default',
+        }
+      }
+    };
+
+    try {
+      await admin.messaging().sendToDevice(data.toToken, payload);
+    } catch (e) {
+      console.error('Error delivering queued notification:', e);
     }
     return null;
   });

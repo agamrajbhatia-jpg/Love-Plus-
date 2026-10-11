@@ -206,17 +206,46 @@ class AppState extends ChangeNotifier {
   }
 
   StreamSubscription? _coupleSub;
+  StreamSubscription? _partnerUserSub;
   StreamSubscription? _challengesSub;
   bool isPartnerTyping = false;
   bool readReceiptsEnabled = true;
+  String? partnerPhotoUrl;
+  String? partnerUid;
+
+  void _listenToPartnerUser(String? pUid) {
+    _partnerUserSub?.cancel();
+    if (pUid == null) return;
+    _partnerUserSub = FirebaseFirestore.instance.collection('users').doc(pUid).snapshots().listen((doc) {
+      if (doc.exists) {
+        final data = doc.data();
+        final String? newPhoto = data?['photoUrl'] ?? data?['profileImageUrl'];
+        final String? newName = data?['name'];
+        bool changed = false;
+        if (newPhoto != partnerPhotoUrl) {
+          partnerPhotoUrl = newPhoto;
+          changed = true;
+        }
+        if (newName != null && newName.isNotEmpty && newName != partnerName) {
+          partnerName = newName;
+          changed = true;
+        }
+        if (changed) notifyListeners();
+      }
+    });
+  }
 
   void _listenToCoupleData(String coupleId) {
     _coupleSub?.cancel();
     _coupleSub = FirebaseFirestore.instance.collection('couples').doc(coupleId).snapshots().listen((snapshot) {
       if (snapshot.exists) {
         final data = snapshot.data()!;
-        final partnerUid = currentUid == data['user1'] ? data['user2'] : data['user1'];
-        final newIsTyping = data['typing_$partnerUid'] ?? false;
+        final pUid = currentUid == data['user1'] ? data['user2'] : data['user1'];
+        if (pUid != partnerUid) {
+          partnerUid = pUid;
+          _listenToPartnerUser(pUid);
+        }
+        final newIsTyping = data['typing_$pUid'] ?? false;
         
         if (isPartnerTyping != newIsTyping) {
           isPartnerTyping = newIsTyping;
@@ -224,7 +253,7 @@ class AppState extends ChangeNotifier {
         }
         
         final newMyScore = data['score_$currentUid'] ?? 0;
-        final newPartnerScore = data['score_$partnerUid'] ?? 0;
+        final newPartnerScore = data['score_$pUid'] ?? 0;
         if (userGameScore != newMyScore || partnerGameScore != newPartnerScore) {
           userGameScore = newMyScore as int;
           partnerGameScore = newPartnerScore as int;
@@ -506,6 +535,15 @@ class AppState extends ChangeNotifier {
         'imageUrl': message.imageUrl,
         'isLiked': message.isLiked,
       });
+
+    NotificationService.dispatchPushNotification(
+      coupleId: currentCoupleId,
+      partnerUid: partnerUid,
+      title: '💬 New message from ${(userName != null && userName!.isNotEmpty) ? userName! : "Your partner"}',
+      body: message.text.isNotEmpty ? message.text : (message.imageUrl != null ? '📸 Sent a photo' : 'Sent a message'),
+      type: 'chat',
+      chatId: currentCoupleId,
+    );
   }
 
   void toggleLike(String messageId) {
@@ -522,8 +560,14 @@ class AppState extends ChangeNotifier {
       .update({'isLiked': newLikeState});
       
     if (newLikeState) {
-      // Trigger a cloud function/FCM payload here
-      debugPrint("FCM STUB: PUSH NOTIFICATION -> 'Your partner loved your message!'");
+      NotificationService.dispatchPushNotification(
+        coupleId: currentCoupleId,
+        partnerUid: partnerUid,
+        title: '❤️ Message Loved',
+        body: '${(userName != null && userName!.isNotEmpty) ? userName! : "Your partner"} loved your message!',
+        type: 'chat',
+        chatId: currentCoupleId,
+      );
     }
   }
 
@@ -677,9 +721,15 @@ class AppState extends ChangeNotifier {
     
     await batch.commit();
     
-    // 3. Stub for FCM Push Notification (Client-side simulation)
-    print("FCM STUB: Sending push notification to partner with title 'New Love-Board Post' and body 'Your partner just posted a $purpose.'");
-    // Normally, here you would call a Cloud Function or FCM HTTP v1 API.
+    // 3. Dispatch FCM Push Notification to partner
+    NotificationService.dispatchPushNotification(
+      coupleId: currentCoupleId,
+      partnerUid: partnerUid,
+      title: '💌 New Love Letter',
+      body: '${(userName != null && userName!.isNotEmpty) ? userName! : "Your partner"} just posted a $purpose.',
+      type: 'memo',
+      chatId: currentCoupleId,
+    );
   }
 
   // GAME INDEX TRACKING
@@ -747,16 +797,20 @@ class AppState extends ChangeNotifier {
     if (currentUid == null) return;
     try {
       final messaging = FirebaseMessaging.instance;
-      NotificationSettings settings = await messaging.requestPermission();
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
       
       if (settings.authorizationStatus == AuthorizationStatus.authorized || settings.authorizationStatus == AuthorizationStatus.provisional) {
         String? token = await messaging.getToken();
         if (token != null) {
-          await FirebaseFirestore.instance.collection('users').doc(currentUid).update({'fcmToken': token});
+          await FirebaseFirestore.instance.collection('users').doc(currentUid).set({'fcmToken': token}, SetOptions(merge: true));
         }
         
         messaging.onTokenRefresh.listen((newToken) {
-          FirebaseFirestore.instance.collection('users').doc(currentUid).update({'fcmToken': newToken});
+          FirebaseFirestore.instance.collection('users').doc(currentUid).set({'fcmToken': newToken}, SetOptions(merge: true));
         });
       }
     } catch (e) {

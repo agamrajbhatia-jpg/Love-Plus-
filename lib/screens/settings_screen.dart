@@ -15,6 +15,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import '../providers/app_state.dart';
 import '../main.dart';
 import 'premium_benefits_screen.dart';
+import '../widgets/feature_walkthrough_modal.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -135,24 +136,219 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _handleBuyPremium() async {
     try {
       setState(() => _isPurchasing = true);
+
+      final bool isAvailable = await _inAppPurchase.isAvailable().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => false,
+      );
+
+      if (!isAvailable) {
+        if (mounted) _showDemoUnlockBottomSheet();
+        return;
+      }
+
       const Set<String> kIds = <String>{'loveplus_premium_monthly'};
-      final ProductDetailsResponse response = await _inAppPurchase.queryProductDetails(kIds);
+      final ProductDetailsResponse response = await _inAppPurchase
+          .queryProductDetails(kIds)
+          .timeout(
+            const Duration(seconds: 4),
+            onTimeout: () => ProductDetailsResponse(
+              productDetails: [],
+              notFoundIDs: ['loveplus_premium_monthly'],
+            ),
+          );
+
       if (response.productDetails.isNotEmpty) {
         final ProductDetails productDetails = response.productDetails.first;
         final PurchaseParam purchaseParam = PurchaseParam(productDetails: productDetails);
         await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
       } else {
-        if (mounted) {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumBenefitsScreen()));
-        }
+        if (mounted) _showDemoUnlockBottomSheet();
       }
     } catch (e) {
       debugPrint("Error triggering purchase: $e");
-      if (mounted) {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumBenefitsScreen()));
-      }
+      if (mounted) _showDemoUnlockBottomSheet();
     } finally {
       if (mounted) setState(() => _isPurchasing = false);
+    }
+  }
+
+  void _showDemoUnlockBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xE6140F24),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border(
+                top: BorderSide(color: const Color(0xFFFF2A6D).withOpacity(0.5), width: 1.5),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF2A6D).withOpacity(0.4),
+                          blurRadius: 16,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Love Plus Premium',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Google Play Billing is synchronizing monetization or awaiting Play Console setup. You can activate instant Demo / Test Unlock to experience all premium features right now!',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildFeatureRow('✨ Unlimited AI Love Memos & Photo Studio'),
+                        const SizedBox(height: 8),
+                        _buildFeatureRow('🗺️ Live Radar & Instant Maps Navigation'),
+                        const SizedBox(height: 8),
+                        _buildFeatureRow('🎮 Full Unlocked Couple Game & Question Library'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: _activateDemoPremium,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFF2A6D).withOpacity(0.4),
+                            blurRadius: 12,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          '⚡ Activate Demo Unlock Now',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const PremiumBenefitsScreen()),
+                      );
+                    },
+                    child: Text(
+                      'View All Benefits & Pricing',
+                      style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureRow(String text) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.9), fontSize: 13),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _activateDemoPremium() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'isPremium': true,
+        }, SetOptions(merge: true));
+      }
+      if (mounted) {
+        setState(() {
+          _isPremium = true;
+        });
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF1E1035),
+            content: Text('✨ Love Plus Premium activated in test mode! Enjoy all perks.'),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error activating demo premium: $e");
     }
   }
 
@@ -338,6 +534,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showHelpAndSupport() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.72,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xE6140F24),
+              border: Border(top: BorderSide(color: const Color(0xFFFF2A6D).withOpacity(0.5), width: 1.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text('Help & Support', style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Welcome to the Love Plus Help Center.\n\n'
+                          '• Live Radar & Distance: Requires location permissions enabled on both devices to stream real-time distance and battery metrics.\n'
+                          '• Syncing & Chat: Make sure both partners have an active internet connection for real-time Firestore updates.\n'
+                          '• Notifications: Push notifications are powered by high-priority background channels. Keep app notifications enabled in system settings.\n\n'
+                          'For further inquiries or account help, email our team at support@coupleapp.com.',
+                          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14, height: 1.55),
+                        ),
+                        const SizedBox(height: 20),
+                        // Replay Walkthrough Button
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            FeatureWalkthroughModal.show(context);
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFFF2A6D).withOpacity(0.35),
+                                  blurRadius: 10,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.explore_rounded, color: Colors.white, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Replay Feature Walkthrough',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Text('Close', style: GoogleFonts.poppins(color: Colors.white70, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -482,105 +787,120 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (!_isPremium) ...[
                       GestureDetector(
                         onTap: _isPurchasing ? null : _handleBuyPremium,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: BackdropFilter(
-                            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                            child: Container(
-                              padding: const EdgeInsets.all(18),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    const Color(0xFFFF2E93).withOpacity(0.2),
-                                    const Color(0xFF6B11FF).withOpacity(0.15),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(width: 1.2, color: const Color(0xFFFF2E93).withOpacity(0.35)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFFF2E93).withOpacity(0.12),
-                                    blurRadius: 20,
-                                    spreadRadius: 1,
-                                  )
-                                ],
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(22),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF2A6D).withOpacity(0.22),
+                                blurRadius: 18,
+                                offset: const Offset(0, 4),
                               ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: const LinearGradient(
-                                        colors: [Color(0xFFFF2E93), Color(0xFFFF8E53)],
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(1.2),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(21),
+                            child: BackdropFilter(
+                              filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF161026).withOpacity(0.78),
+                                  borderRadius: BorderRadius.circular(21),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Left: Gradient squircle icon containing a glowing star/crown icon
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(14),
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFFF2A6D).withOpacity(0.4),
+                                            blurRadius: 12,
+                                          ),
+                                        ],
                                       ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFFFF2E93).withOpacity(0.4),
-                                          blurRadius: 10,
-                                        )
-                                      ],
+                                      child: const Center(
+                                        child: Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 28),
+                                      ),
                                     ),
-                                    child: const Center(
-                                      child: Icon(Icons.star_rounded, color: Colors.white, size: 28),
+                                    const SizedBox(width: 14),
+                                    // Center: Clean typography
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Love Plus Premium',
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: -0.2,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Unlimited AI memos, live widgets & couple games',
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white70,
+                                              fontSize: 13,
+                                              height: 1.25,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Love Plus Premium',
+                                    const SizedBox(width: 10),
+                                    // Right: A pill button or chip displaying localized price tag
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFFF2A6D).withOpacity(0.4),
+                                            blurRadius: 10,
+                                            spreadRadius: 0.5,
+                                          ),
+                                        ],
+                                      ),
+                                      child: _isPurchasing
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                            )
+                                          : Text(
+                                              _localizedPrice.contains('/mo') ? _localizedPrice : '$_localizedPrice/mo',
                                               style: GoogleFonts.poppins(
                                                 color: Colors.white,
-                                                fontSize: 16,
                                                 fontWeight: FontWeight.bold,
+                                                fontSize: 12.5,
+                                                letterSpacing: 0.2,
                                               ),
                                             ),
-                                            const SizedBox(width: 6),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFFFD700),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                _localizedPrice,
-                                                style: GoogleFonts.poppins(
-                                                  color: Colors.black,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Unlock infinite AI memos & couple games for $_localizedPrice/mo',
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white70,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _isPurchasing
-                                      ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 16),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -651,12 +971,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconColor: const Color(0xFF00D2B4),
                                 iconBgColor: const Color(0xFF00D2B4).withOpacity(0.15),
                                 title: 'Help & Support',
-                                onTap: () {
-                                  _showGlassModal(
-                                    'Help & Support',
-                                    'Welcome to the Help Center.\n\nIf you have any issues with pairing, syncing, or missing data, please ensure both partners are on the latest version of the app and have stable internet connections.\n\nFor further assistance, reach out to our support team at support@coupleapp.com.',
-                                  );
-                                },
+                                onTap: _showHelpAndSupport,
                               ),
                               _buildDivider(),
                               _buildSettingTile(

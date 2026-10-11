@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'settings_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/app_state.dart';
 import 'modes/ootd_screen.dart';
 import 'modes/location_screen.dart';
@@ -16,10 +15,8 @@ import '../widgets/glass_container.dart';
 import '../widgets/floating_hearts_background.dart';
 import '../widgets/bouncing_button.dart';
 import 'modes/game_zone_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/premium_gate_service.dart';
-import 'premium_benefits_screen.dart';
-import '../main.dart';
+import '../widgets/feature_walkthrough_modal.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -37,6 +34,19 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _checkPremiumStatus();
+    _checkWalkthroughStatus();
+  }
+
+  Future<void> _checkWalkthroughStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeen = prefs.getBool('has_seen_walkthrough') ?? false;
+      if (!hasSeen && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) FeatureWalkthroughModal.show(context);
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkPremiumStatus() async {
@@ -73,8 +83,76 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          // Chat Icon (Left of Settings)
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
+            child: BouncingButton(
+              onTap: () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (context) => const MessengerHubScreen()),
+                );
+              },
+              child: Consumer<AppState>(
+                builder: (context, state, child) {
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 18),
+                        ),
+                      ),
+                      if (state.unreadCount > 0)
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF2A6D),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFFF2A6D).withOpacity(0.5),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                state.unreadCount > 99 ? '99+' : state.unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+          // Settings Icon (Rightmost Edge)
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
             child: BouncingButton(
               onTap: () {
                 Navigator.push(
@@ -83,52 +161,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
               child: Container(
-                padding: const EdgeInsets.all(8),
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withOpacity(0.18),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withOpacity(0.5)),
+                  border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
-                  ]
+                    BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8),
+                  ],
                 ),
-                child: const Icon(Icons.settings, color: Colors.white, size: 20),
+                child: const Center(
+                  child: Icon(Icons.settings, color: Colors.white, size: 19),
+                ),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: BouncingButton(
-              onTap: () {
-                Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => const MessengerHubScreen())
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withOpacity(0.5)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
-                  ]
-                ),
-                child: Consumer<AppState>(
-                  builder: (context, state, child) {
-                    return Badge(
-                      isLabelVisible: state.unreadCount > 0,
-                      label: Text(state.unreadCount.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
-                      backgroundColor: const Color(0xFFFF4D6D),
-                      offset: const Offset(-2, -2),
-                      child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 20),
-                    );
-                  }
-                ),
-              ),
-            ),
-          )
         ],
       ),
       body: Stack(

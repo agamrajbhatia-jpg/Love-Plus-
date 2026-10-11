@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui';
@@ -7,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:record/record.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -253,10 +251,86 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
                 icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
                 onPressed: () => Navigator.pop(context),
               ),
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: theme.accentColor.withOpacity(0.5),
-                child: const Icon(Icons.person, color: Colors.white),
+              // Partner Avatar: Real profile photo with styled first-letter monogram fallback
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFFF2A6D),
+                    width: 2.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF2A6D).withOpacity(0.35),
+                      blurRadius: 8,
+                      spreadRadius: 0.5,
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: (appState.partnerPhotoUrl != null &&
+                          appState.partnerPhotoUrl!.isNotEmpty &&
+                          appState.partnerPhotoUrl!.startsWith('http'))
+                      ? CachedNetworkImage(
+                          imageUrl: appState.partnerPhotoUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                partnerName.isNotEmpty ? partnerName[0].toUpperCase() : 'L',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                partnerName.isNotEmpty ? partnerName[0].toUpperCase() : 'L',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              partnerName.isNotEmpty ? partnerName[0].toUpperCase() : 'L',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(

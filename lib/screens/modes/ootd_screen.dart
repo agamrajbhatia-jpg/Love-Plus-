@@ -111,10 +111,18 @@ class _OOTDScreenState extends State<OOTDScreen> {
         'imageUrl': downloadUrl,
         'timestamp': FieldValue.serverTimestamp(),
         'hypeCount': 0,
-        'fitRating': 0.0
+        'fitRating': 0.0,
       }, SetOptions(merge: true));
 
-      debugPrint("FCM PUSH TRIGGER: To Partner -> ✨ New Outfit Dropped! [Partner Name] just shared their Outfit of the Day. Tap to view!");
+      final appState = Provider.of<AppState>(context, listen: false);
+      NotificationService.dispatchPushNotification(
+        coupleId: coupleId,
+        partnerUid: appState.partnerUid,
+        title: '👕 New Outfit Dropped!',
+        body: '${(appState.userName != null && appState.userName!.isNotEmpty) ? appState.userName! : "Your partner"} just shared their Outfit of the Day. Tap to view!',
+        type: 'ootd',
+        chatId: coupleId,
+      );
 
       if (mounted) {
         setState(() {

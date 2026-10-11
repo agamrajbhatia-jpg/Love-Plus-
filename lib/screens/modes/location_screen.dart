@@ -189,23 +189,23 @@ class _LocationScreenState extends State<LocationScreen> {
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
     
-    final Color haloColor = isMe ? const Color(0xFF00FFFF) : const Color(0xFFFFB300);
-    final Color glowColor = isMe ? const Color(0xFF8A2BE2) : const Color(0xFFE11D48);
+    final Color haloColor = isMe ? const Color(0xFF00FFFF) : const Color(0xFFFF2E93);
+    final Color glowColor = isMe ? const Color(0xFF8A2BE2) : const Color(0xFFFF2E93);
     final double radius = 85.0;
     final Offset center = Offset(size / 2, size / 2.2);
 
     final Paint shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      ..color = Colors.black.withOpacity(0.55)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
     canvas.drawCircle(Offset(center.dx, center.dy + 15), radius, shadowPaint);
 
     final Paint pulseGlowPaint = Paint()
-      ..color = glowColor.withOpacity(0.4)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+      ..color = glowColor.withOpacity(0.45)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
     canvas.drawCircle(center, radius + 15, pulseGlowPaint);
     
     final Paint neonRingPaint = Paint()
-      ..color = haloColor.withOpacity(0.6)
+      ..color = haloColor.withOpacity(0.65)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
@@ -221,9 +221,16 @@ class _LocationScreenState extends State<LocationScreen> {
     canvas.drawPath(pointerPath, shadowPaint); 
 
     final Paint borderPaint = Paint()
-      ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;
+    if (isMe) {
+      borderPaint.color = Colors.white;
+    } else {
+      borderPaint.shader = ui.Gradient.sweep(
+        center,
+        [const Color(0xFFFF2E93), const Color(0xFF00F0FF), const Color(0xFF9B51E0), const Color(0xFFFF2E93)],
+      );
+    }
     canvas.drawCircle(center, radius, borderPaint);
 
     ui.Image? image;
@@ -253,11 +260,18 @@ class _LocationScreenState extends State<LocationScreen> {
     canvas.clipPath(clipPath);
 
     if (image != null) {
-      final Paint paintImage = Paint();
+      final Paint paintImage = Paint()..filterQuality = FilterQuality.high;
+      final double srcW = image.width.toDouble();
+      final double srcH = image.height.toDouble();
+      final double minDim = min(srcW, srcH);
+      final double srcX = (srcW - minDim) / 2;
+      final double srcY = (srcH - minDim) / 2;
+      final Rect srcRect = Rect.fromLTWH(srcX, srcY, minDim, minDim);
+      final Rect dstRect = Rect.fromLTWH(center.dx - radius + 2, center.dy - radius + 2, radius * 2 - 4, radius * 2 - 4);
       canvas.drawImageRect(
         image,
-        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
-        Rect.fromLTWH(center.dx - radius + 2, center.dy - radius + 2, radius * 2 - 4, radius * 2 - 4),
+        srcRect,
+        dstRect,
         paintImage,
       );
     } else if (isEmoji && imageUrl != null) {
@@ -659,43 +673,55 @@ class _LocationScreenState extends State<LocationScreen> {
     );
   }
 
+  String _getAqiStatus(int aqi) {
+    if (aqi <= 50) return 'Good';
+    if (aqi <= 100) return 'Moderate';
+    if (aqi <= 150) return 'Sensitive';
+    return 'High';
+  }
+
   Widget _buildTopStatusHud(AppState appState) {
     final batteryColor = _partnerBattery <= 20
         ? const Color(0xFFFF453A)
         : (_partnerBattery <= 40 ? const Color(0xFFFF9F0A) : const Color(0xFF32D74B));
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xD90D0F1A),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.2),
+            color: const Color(0xE6120D22),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFFF2E93).withOpacity(0.35), width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 18,
+                color: Colors.black.withOpacity(0.45),
+                blurRadius: 20,
                 offset: const Offset(0, 4),
-              )
+              ),
+              BoxShadow(
+                color: const Color(0xFFFF2E93).withOpacity(0.12),
+                blurRadius: 16,
+              ),
             ],
           ),
           child: Row(
             children: [
-              // Heart Icon Badge
+              // [ ❤️ ]
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: const Color(0xFFFF2E93).withOpacity(0.2),
+                  border: Border.all(color: const Color(0xFFFF2E93).withOpacity(0.4), width: 1),
                 ),
-                child: const Icon(Icons.favorite_rounded, color: Color(0xFFFF2E93), size: 15),
+                child: const Icon(Icons.favorite_rounded, color: Color(0xFFFF2E93), size: 14),
               ),
-              const SizedBox(width: 8),
+              _buildHudDivider(),
 
-              // Metrics Row: Distance, Weather, AQI, Battery
+              // Metrics Row: [ 📍 Distance ] | [ ☀️ Weather ] | [ 🍃 AQI ] | [ ⚡ Battery ]
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -703,15 +729,15 @@ class _LocationScreenState extends State<LocationScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // a) Real-time Distance
+                      // [ 📍 Real-time Distance ]
                       _buildHudMetric(
-                        icon: Icons.near_me_rounded,
+                        icon: Icons.location_on_rounded,
                         iconColor: const Color(0xFF00F0FF),
                         label: _hasPartnerLocation ? _distanceText : "Locating...",
                       ),
                       _buildHudDivider(),
 
-                      // b) Weather
+                      // [ ☀️ Weather & Temp ]
                       _buildHudMetric(
                         icon: _getWeatherIcon(_partnerWeather),
                         iconColor: const Color(0xFFFFB800),
@@ -719,19 +745,17 @@ class _LocationScreenState extends State<LocationScreen> {
                       ),
                       _buildHudDivider(),
 
-                      // c) Air Quality Index (AQI)
+                      // [ 🍃 AQI with color status ]
                       _buildHudMetric(
-                        icon: Icons.air_rounded,
+                        icon: Icons.eco_rounded,
                         iconColor: _getAqiColor(_partnerAqi),
                         label: "AQI $_partnerAqi",
                       ),
                       _buildHudDivider(),
 
-                      // d) Battery Percentage
+                      // [ ⚡ Battery ]
                       _buildHudMetric(
-                        icon: _partnerBattery <= 20
-                            ? Icons.battery_alert_rounded
-                            : (_partnerBattery <= 50 ? Icons.battery_3_bar_rounded : Icons.battery_full_rounded),
+                        icon: Icons.bolt_rounded,
                         iconColor: batteryColor,
                         label: "$_partnerBattery%",
                       ),
@@ -740,14 +764,14 @@ class _LocationScreenState extends State<LocationScreen> {
                 ),
               ),
 
-              const SizedBox(width: 8),
+              _buildHudDivider(),
 
-              // Directions Action Button CTA
+              // [ ↗ Directions ] CTA
               Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: _launchDirections,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
@@ -756,7 +780,7 @@ class _LocationScreenState extends State<LocationScreen> {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
                           color: const Color(0xFFFF2E93).withOpacity(0.35),
@@ -768,7 +792,7 @@ class _LocationScreenState extends State<LocationScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.directions_rounded, color: Colors.white, size: 14),
+                        const Icon(Icons.near_me_rounded, color: Colors.white, size: 13),
                         const SizedBox(width: 4),
                         Text(
                           'Directions',
@@ -793,7 +817,7 @@ class _LocationScreenState extends State<LocationScreen> {
 
   Widget _buildHudMetric({required IconData icon, required Color iconColor, required String label}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -814,10 +838,10 @@ class _LocationScreenState extends State<LocationScreen> {
 
   Widget _buildHudDivider() {
     return Container(
-      height: 12,
+      height: 14,
       width: 1,
       color: Colors.white24,
-      margin: const EdgeInsets.symmetric(horizontal: 3),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 }
