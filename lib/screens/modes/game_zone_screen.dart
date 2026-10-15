@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/app_state.dart';
 import '../../widgets/glass_container.dart';
@@ -19,6 +18,7 @@ import '../games/expose_us_screen.dart';
 import '../games/live_card_game_screen.dart';
 import '../games/ranking_date_ideas_screen.dart';
 import '../games/visual_custom_deck_creator_screen.dart';
+import '../games/play_custom_game_screen.dart';
 import '../../services/firebase_gate_service.dart';
 
 class GameZoneScreen extends StatefulWidget {
@@ -210,90 +210,309 @@ class _GameZoneScreenState extends State<GameZoneScreen> {
       stream: FirebaseFirestore.instance
           .collection('couples')
           .doc(appState.currentCoupleId)
-          .collection('custom_decks')
+          .collection('custom_games')
           .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const SizedBox();
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          return _renderCustomGamesList(snapshot.data!.docs, appState);
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                "Custom Games Inbox",
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            SizedBox(
-              height: 130,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: snapshot.data!.docs.length,
-                itemBuilder: (context, index) {
-                  final doc = snapshot.data!.docs[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  final title = data['title'] ?? 'Custom Game';
-                  final author = data['createdBy'] == appState.currentUid ? 'You' : 'Partner';
-                  final template = data['templateType'] ?? 'CoupleCards';
-                  final List<String> questions = (data['questions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
-
-                  return GestureDetector(
-                    onTap: () {
-                      _handleGameTap(template, () {
-                        final cardTitle = template;
-                        if (cardTitle.toLowerCase().contains('would you rather')) {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => WouldYouRatherScreen(customQuestions: questions, customDeckId: doc.id)));
-                          return;
-                        }
-                        final safeRoute = template.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-                        if (safeRoute == 'couplecards') {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => LiveCardGameScreen(deckName: 'Custom Deck', customQuestions: questions, customDeckId: doc.id)));
-                        }
-                      });
-                    },
-                    child: Container(
-                      width: 140,
-                      margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF2C3E50), Color(0xFF3498DB)]),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.mail, color: Colors.white, size: 28),
-                          const SizedBox(height: 8),
-                          Text(
-                            title,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
-                          Text(
-                            "By $author",
-                            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 10),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
+        // Fallback for pre-existing custom_decks docs
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('couples')
+              .doc(appState.currentCoupleId)
+              .collection('custom_decks')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, fallbackSnapshot) {
+            if (!fallbackSnapshot.hasData || fallbackSnapshot.data!.docs.isEmpty) {
+              return const SizedBox();
+            }
+            return _renderCustomGamesList(fallbackSnapshot.data!.docs, appState);
+          },
         );
       },
+    );
+  }
+
+  Widget _renderCustomGamesList(List<QueryDocumentSnapshot> docs, AppState appState) {
+    final currentUid = appState.currentUid;
+
+    // Recipient filtering: playable incoming cards for current user
+    final incomingDocs = docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final target = data['targetUserId']?.toString();
+      final creator = data['creatorId']?.toString() ?? data['createdBy']?.toString();
+      if (target != null && target.isNotEmpty) {
+        return target == currentUid;
+      }
+      return creator != currentUid;
+    }).toList();
+
+    // Creator filtering: outgoing cards created by current user
+    final outgoingDocs = docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final creator = data['creatorId']?.toString() ?? data['createdBy']?.toString();
+      return creator == currentUid;
+    }).toList();
+
+    if (incomingDocs.isEmpty && outgoingDocs.isEmpty) {
+      return const SizedBox();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (incomingDocs.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                const Text("💌", style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 8),
+                Text(
+                  "Games From Your Partner",
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF2A6D),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    "${incomingDocs.length}",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 140,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: incomingDocs.length,
+              itemBuilder: (context, index) {
+                final doc = incomingDocs[index];
+                final data = doc.data() as Map<String, dynamic>;
+                final title = data['title']?.toString() ?? data['templateType']?.toString() ?? 'Custom Game';
+                final isPending = (data['status'] ?? 'pending') == 'pending' && !(data['isPlayed'] == true);
+                final questions = (data['questions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+
+                return Container(
+                  width: 170,
+                  margin: const EdgeInsets.only(right: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2C1654), Color(0xFF4A154B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFFFF2A6D).withOpacity(0.55),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF2A6D).withOpacity(0.25),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PlayCustomGameScreen(
+                              gameId: doc.id,
+                              data: {
+                                ...data,
+                                'id': doc.id,
+                                'questions': questions,
+                                'title': title,
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text("✨", style: TextStyle(fontSize: 22)),
+                                if (isPending)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF2A6D),
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFFF2A6D).withOpacity(0.6),
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      "NEW",
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  "${questions.length} cards • Tap to play",
+                                  style: GoogleFonts.poppins(
+                                    color: const Color(0xFFFF7597),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+
+        // Outgoing inactive section for creator
+        if (outgoingDocs.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                const Text("📤", style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+                Text(
+                  "Sent to Partner • Waiting for response",
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white60,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 105,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: outgoingDocs.length,
+              itemBuilder: (context, index) {
+                final doc = outgoingDocs[index];
+                final data = doc.data() as Map<String, dynamic>;
+                final title = data['title']?.toString() ?? data['templateType']?.toString() ?? 'Custom Game';
+                final isCompleted = data['status'] == 'completed' || data['isPlayed'] == true;
+
+                return Container(
+                  width: 155,
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.12),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isCompleted
+                              ? const Color(0xFF00F0FF).withOpacity(0.15)
+                              : Colors.amber.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isCompleted
+                                ? const Color(0xFF00F0FF).withOpacity(0.4)
+                                : Colors.amber.withOpacity(0.4),
+                          ),
+                        ),
+                        child: Text(
+                          isCompleted ? "✅ Completed" : "⏳ Waiting...",
+                          style: GoogleFonts.poppins(
+                            color: isCompleted ? const Color(0xFF00F0FF) : Colors.amberAccent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ],
     );
   }
 

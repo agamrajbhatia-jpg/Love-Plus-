@@ -78,14 +78,36 @@ class _VisualCustomDeckCreatorScreenState extends State<VisualCustomDeckCreatorS
         }
       }
 
-      final doc = FirebaseFirestore.instance.collection('couples').doc(coupleId).collection('custom_decks').doc();
-      await doc.set({
-        'templateType': widget.templateType,
-        'questions': finalQuestions,
-        'createdBy': uid,
+      String? targetUserId = appState.partnerUid;
+      if ((targetUserId == null || targetUserId.isEmpty) && coupleId.contains('_')) {
+        targetUserId = coupleId.split('_').firstWhere((id) => id != uid, orElse: () => '');
+      }
+
+      final isQuiz = widget.templateType.toLowerCase().contains('quiz') || widget.templateType == 'Would You Rather';
+      final gameType = isQuiz ? 'quiz' : 'couple_card';
+
+      final doc = FirebaseFirestore.instance.collection('couples').doc(coupleId).collection('custom_games').doc();
+      final gamePayload = {
+        'id': doc.id,
+        'creatorId': uid,
+        'targetUserId': targetUserId ?? '',
         'createdAt': FieldValue.serverTimestamp(),
-        'isPlayed': false,
-      });
+        'type': gameType,
+        'status': 'pending',
+        'title': widget.templateType,
+        'questions': finalQuestions,
+      };
+      await doc.set(gamePayload);
+
+      // Keep backward compatibility with custom_decks collection
+      try {
+        await FirebaseFirestore.instance.collection('couples').doc(coupleId).collection('custom_decks').doc(doc.id).set({
+          ...gamePayload,
+          'templateType': widget.templateType,
+          'createdBy': uid,
+          'isPlayed': false,
+        });
+      } catch (_) {}
 
       await FirebaseGateService.recordCustomCreation(coupleId, uid);
 

@@ -409,7 +409,14 @@ class _OOTDScreenState extends State<OOTDScreen> {
     required String partnerUid,
     required Map<String, dynamic>? partnerData,
   }) {
-    final theme = appState.chatTheme ?? appState.availableThemes.first;
+    final bool isGf = (appState.userRole ?? '').toUpperCase().contains('GF') ||
+                      (appState.userRole ?? '').toUpperCase().contains('GIRL') ||
+                      (appState.userRole ?? '').toUpperCase().contains('FEMALE');
+    final Color roleBorderColor = isGf ? const Color(0xFFFF2A6D) : const Color(0xFF00C6FF);
+    final Color roleShadowColor = isGf
+        ? const Color(0xFFFF2A6D).withOpacity(0.4)
+        : const Color(0xFF00C6FF).withOpacity(0.4);
+    final String partnerDisplayName = appState.effectivePartnerName;
 
     if (partnerData == null || partnerData['imageUrl'] == null) {
       return Container(
@@ -418,10 +425,10 @@ class _OOTDScreenState extends State<OOTDScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: theme.accentColor.withOpacity(0.28),
-              blurRadius: 22,
-              spreadRadius: -2,
-              offset: const Offset(0, 8),
+              color: roleShadowColor,
+              blurRadius: 10,
+              spreadRadius: 1,
+              offset: const Offset(0, 4),
             )
           ],
         ),
@@ -429,11 +436,14 @@ class _OOTDScreenState extends State<OOTDScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             gradient: LinearGradient(
-              colors: [Colors.white24, Colors.pinkAccent.withOpacity(0.15)],
+              colors: [
+                Colors.white.withOpacity(0.06),
+                roleBorderColor.withOpacity(0.12),
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            border: Border.all(color: theme.accentColor.withOpacity(0.5), width: 1.5),
+            border: Border.all(color: roleBorderColor, width: 1.5),
           ),
           child: Column(
             children: [
@@ -457,10 +467,10 @@ class _OOTDScreenState extends State<OOTDScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.checkroom, size: 72, color: theme.accentColor.withOpacity(0.8)),
+                        Icon(Icons.checkroom, size: 72, color: roleBorderColor.withOpacity(0.85)),
                         const SizedBox(height: 16),
                         Text(
-                          "Waiting for ${appState.partnerName ?? 'Partner'}\nto post their outfit...",
+                          "Waiting for $partnerDisplayName\nto post their outfit...",
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                         ),
@@ -478,7 +488,7 @@ class _OOTDScreenState extends State<OOTDScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            appState.partnerName ?? 'Partner',
+                            partnerDisplayName,
                             style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           Text(
@@ -506,17 +516,17 @@ class _OOTDScreenState extends State<OOTDScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: theme.accentColor.withOpacity(0.28),
-            blurRadius: 22,
-            spreadRadius: -2,
-            offset: const Offset(0, 8),
+            color: roleShadowColor,
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
           )
         ],
       ),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: theme.accentColor.withOpacity(0.6), width: 1.5),
+          border: Border.all(color: roleBorderColor, width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,7 +541,14 @@ class _OOTDScreenState extends State<OOTDScreen> {
                     .collection('ootd')
                     .doc(partnerUid)
                     .update({'hypeCount': FieldValue.increment(1)});
-                // Send push notification to partner
+                NotificationService.dispatchPushNotification(
+                  coupleId: coupleId,
+                  partnerUid: partnerUid,
+                  title: '${appState.userName ?? "Your partner"} reacted 🔥',
+                  body: '${appState.userName ?? "Your partner"} hyped your Outfit of the Day!',
+                  type: 'ootd',
+                  chatId: coupleId,
+                );
                 NotificationService.sendLocalNotification(
                   '${appState.userName ?? 'Your partner'} reacted 🔥',
                   '${appState.userName ?? 'Your partner'} reacted 🔥 to your Outfit of the Day!',
@@ -552,13 +569,13 @@ class _OOTDScreenState extends State<OOTDScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              (appState.partnerName ?? 'Partner').toUpperCase(),
+                              partnerDisplayName.toUpperCase(),
                               style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'EDITORIAL • TODAY',
-                              style: GoogleFonts.poppins(fontSize: 12, color: theme.accentColor, fontWeight: FontWeight.w600, letterSpacing: 2.0),
+                              style: GoogleFonts.poppins(fontSize: 12, color: roleBorderColor, fontWeight: FontWeight.w600, letterSpacing: 2.0),
                             ),
                           ],
                         ),

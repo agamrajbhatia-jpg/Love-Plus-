@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'dart:io' show Platform;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:device_preview/device_preview.dart';
-import 'package:flutter/foundation.dart';
 
 import 'providers/app_state.dart';
 import 'screens/onboarding_screen.dart';
@@ -19,6 +17,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/auth_screen.dart';
 import 'screens/welcome_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/notification_service.dart';
 
 void main() async {
@@ -32,6 +31,7 @@ void main() async {
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     await NotificationService.initialize();
     await NotificationService.requestPermissions();
     NotificationService.syncFCMToken();

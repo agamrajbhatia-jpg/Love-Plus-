@@ -14,8 +14,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../providers/app_state.dart';
 import '../main.dart';
-import 'premium_benefits_screen.dart';
 import '../widgets/feature_walkthrough_modal.dart';
+import '../widgets/love_plus_paywall_modal.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -51,6 +51,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  ProductDetails? _monthlyProduct;
+
   void _initInAppPurchases() {
     try {
       final Stream<List<PurchaseDetails>> purchaseUpdated = _inAppPurchase.purchaseStream;
@@ -74,16 +76,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _fetchProductPrice() async {
     try {
-      final bool available = await _inAppPurchase.isAvailable();
-      if (!available) return;
+      final bool available = await _inAppPurchase.isAvailable().timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => false,
+      );
+      if (!available) {
+        debugPrint("In-app billing not currently available on device");
+        return;
+      }
 
       const Set<String> kIds = <String>{'loveplus_premium_monthly'};
-      final ProductDetailsResponse response = await _inAppPurchase.queryProductDetails(kIds);
+      final ProductDetailsResponse response = await _inAppPurchase.queryProductDetails(kIds).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => ProductDetailsResponse(
+          productDetails: [],
+          notFoundIDs: ['loveplus_premium_monthly'],
+          error: null,
+        ),
+      );
       if (response.productDetails.isNotEmpty) {
         final product = response.productDetails.firstWhere(
           (p) => p.id == 'loveplus_premium_monthly',
           orElse: () => response.productDetails.first,
         );
+        _monthlyProduct = product;
         if (mounted) {
           setState(() {
             _localizedPrice = product.price;
@@ -99,15 +115,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     for (final purchaseDetails in purchaseDetailsList) {
       if (purchaseDetails.status == PurchaseStatus.pending) {
         if (mounted) setState(() => _isPurchasing = true);
+        // Safety timeout in case pending state hangs indefinitely
+        Timer(const Duration(seconds: 25), () {
+          if (mounted && _isPurchasing) {
+            setState(() => _isPurchasing = false);
+          }
+        });
       } else {
         if (purchaseDetails.status == PurchaseStatus.error) {
           debugPrint("Purchase error: ${purchaseDetails.error}");
           if (mounted) {
             setState(() => _isPurchasing = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Purchase error: ${purchaseDetails.error?.message ?? "Failed"}')),
+              SnackBar(content: Text('Purchase error: ${purchaseDetails.error?.message ?? "Cancelled"}')),
             );
           }
+        } else if (purchaseDetails.status == PurchaseStatus.canceled) {
+          if (mounted) setState(() => _isPurchasing = false);
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
           final user = FirebaseAuth.instance.currentUser;
@@ -133,223 +157,232 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _handleBuyPremium() async {
-    try {
-      setState(() => _isPurchasing = true);
+  Future<void> _buyMonthlyDirectly() async {
+    if (_isPurchasing) return;
+    setState(() => _isPurchasing = true);
 
-      final bool isAvailable = await _inAppPurchase.isAvailable().timeout(
-        const Duration(seconds: 3),
+    try {
+      final isAvailable = await _inAppPurchase.isAvailable().timeout(
+        const Duration(seconds: 6),
         onTimeout: () => false,
       );
 
       if (!isAvailable) {
-        if (mounted) _showDemoUnlockBottomSheet();
+        if (mounted) {
+          setState(() => _isPurchasing = false);
+          _openPaywall();
+        }
         return;
       }
 
-      const Set<String> kIds = <String>{'loveplus_premium_monthly'};
-      final ProductDetailsResponse response = await _inAppPurchase
-          .queryProductDetails(kIds)
-          .timeout(
-            const Duration(seconds: 4),
-            onTimeout: () => ProductDetailsResponse(
-              productDetails: [],
-              notFoundIDs: ['loveplus_premium_monthly'],
-            ),
-          );
+      ProductDetails? product = _monthlyProduct;
+      if (product == null) {
+        final resp = await _inAppPurchase.queryProductDetails({'loveplus_premium_monthly'}).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => ProductDetailsResponse(productDetails: [], notFoundIDs: []),
+        );
+        if (resp.productDetails.isNotEmpty) {
+          product = resp.productDetails.first;
+          _monthlyProduct = product;
+        }
+      }
 
-      if (response.productDetails.isNotEmpty) {
-        final ProductDetails productDetails = response.productDetails.first;
-        final PurchaseParam purchaseParam = PurchaseParam(productDetails: productDetails);
+      if (product != null) {
+        final purchaseParam = PurchaseParam(productDetails: product);
         await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
+        // Automatic fallback timeout if the billing dialog is dismissed or does not trigger a stream event
+        Timer(const Duration(seconds: 18), () {
+          if (mounted && _isPurchasing) {
+            setState(() => _isPurchasing = false);
+          }
+        });
       } else {
-        if (mounted) _showDemoUnlockBottomSheet();
+        if (mounted) {
+          setState(() => _isPurchasing = false);
+          _openPaywall();
+        }
       }
     } catch (e) {
-      debugPrint("Error triggering purchase: $e");
-      if (mounted) _showDemoUnlockBottomSheet();
-    } finally {
-      if (mounted) setState(() => _isPurchasing = false);
+      debugPrint("Direct buy exception: $e");
+      if (mounted) {
+        setState(() => _isPurchasing = false);
+        _openPaywall();
+      }
     }
   }
 
-  void _showDemoUnlockBottomSheet() {
-    showModalBottomSheet(
+  void _openPaywall() {
+    LovePlusPaywallModal.show(context).then((_) {
+      _loadUserData();
+    });
+  }
+
+  void _showEditPartnerNicknameDialog(BuildContext context, AppState appState) {
+    final controller = TextEditingController(text: appState.customPartnerNickname ?? appState.partnerName ?? '');
+    showGeneralDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+      barrierDismissible: true,
+      barrierLabel: 'EditNickname',
+      barrierColor: Colors.black.withOpacity(0.75),
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (ctx, anim1, anim2) {
+        return Center(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            decoration: BoxDecoration(
-              color: const Color(0xE6140F24),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border(
-                top: BorderSide(color: const Color(0xFFFF2A6D).withOpacity(0.5), width: 1.5),
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xF2161026),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFFFF2A6D).withOpacity(0.4), width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF2A6D).withOpacity(0.2),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFF2A6D).withOpacity(0.4),
-                          blurRadius: 16,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 32),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Love Plus Premium',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Google Play Billing is synchronizing monetization or awaiting Play Console setup. You can activate instant Demo / Test Unlock to experience all premium features right now!',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white12),
-                    ),
+                  child: Material(
+                    color: Colors.transparent,
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildFeatureRow('✨ Unlimited AI Love Memos & Photo Studio'),
-                        const SizedBox(height: 8),
-                        _buildFeatureRow('🗺️ Live Radar & Instant Maps Navigation'),
-                        const SizedBox(height: 8),
-                        _buildFeatureRow('🎮 Full Unlocked Couple Game & Question Library'),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                                ),
+                              ),
+                              child: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Edit Partner Name',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Choose a custom nickname for your partner. This will display across your radar, chat, and headers.',
+                          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, height: 1.4),
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: TextField(
+                            controller: controller,
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+                            cursorColor: const Color(0xFFFF2A6D),
+                            autofocus: true,
+                            decoration: InputDecoration(
+                              hintText: "Enter partner's nickname...",
+                              hintStyle: GoogleFonts.poppins(color: Colors.white38),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => Navigator.pop(ctx),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: Colors.white12),
+                                  ),
+                                  child: Text(
+                                    'Cancel',
+                                    style: GoogleFonts.poppins(color: Colors.white70, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  final newNick = controller.text.trim();
+                                  appState.updatePartnerNickname(newNick);
+                                  Navigator.pop(ctx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: const Color(0xFF1E1035),
+                                      content: Text('Partner name updated to "$newNick" ❤️'),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFFF2A6D).withOpacity(0.35),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    'Save',
+                                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  GestureDetector(
-                    onTap: _activateDemoPremium,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFFF2A6D).withOpacity(0.4),
-                            blurRadius: 12,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          '⚡ Activate Demo Unlock Now',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const PremiumBenefitsScreen()),
-                      );
-                    },
-                    child: Text(
-                      'View All Benefits & Pricing',
-                      style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeatureRow(String text) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            text,
-            style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.9), fontSize: 13),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _activateDemoPremium() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'isPremium': true,
-        }, SetOptions(merge: true));
-      }
-      if (mounted) {
-        setState(() {
-          _isPremium = true;
-        });
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Color(0xFF1E1035),
-            content: Text('✨ Love Plus Premium activated in test mode! Enjoy all perks.'),
           ),
         );
-      }
-    } catch (e) {
-      debugPrint("Error activating demo premium: $e");
-    }
+      },
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _loadUserData() async {
@@ -360,7 +393,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (doc.exists) {
         final data = doc.data()!;
         _userName = data['name'] ?? '';
-        _isPremium = data['isPremium'] ?? false;
+        final bool hasPurchasedIap = data['hasPurchasedIap'] == true;
+        // Clean any stale mock demo unlock so Free Tier accurately displays
+        if (data['isPremium'] == true && !hasPurchasedIap) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'isPremium': false});
+          _isPremium = false;
+        } else {
+          _isPremium = hasPurchasedIap;
+        }
         _photoUrl = data['photoUrl'] ?? '';
       }
       if (mounted) setState(() {});
@@ -645,6 +685,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -786,60 +827,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // Premium Card with Dynamic Localized Price
                     if (!_isPremium) ...[
                       GestureDetector(
-                        onTap: _isPurchasing ? null : _handleBuyPremium,
+                        onTap: _openPaywall,
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(22),
                             gradient: const LinearGradient(
-                              colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                              colors: [
+                                Color(0xFFFFD700),
+                                Color(0xFFFF2A6D),
+                                Color(0xFFFF7597),
+                                Color(0xFFB8860B),
+                              ],
+                              stops: [0.0, 0.35, 0.70, 1.0],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFFF2A6D).withOpacity(0.22),
+                                color: const Color(0xFFFFD700).withOpacity(0.18),
                                 blurRadius: 18,
                                 offset: const Offset(0, 4),
+                              ),
+                              BoxShadow(
+                                color: const Color(0xFFFF2A6D).withOpacity(0.15),
+                                blurRadius: 16,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
                           padding: const EdgeInsets.all(1.2),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(21),
+                            borderRadius: BorderRadius.circular(20.8),
                             child: BackdropFilter(
                               filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF161026).withOpacity(0.78),
-                                  borderRadius: BorderRadius.circular(21),
+                                  color: const Color(0xFF140E22).withOpacity(0.85),
+                                  borderRadius: BorderRadius.circular(20.8),
                                 ),
                                 child: Row(
                                   children: [
-                                    // Left: Gradient squircle icon containing a glowing star/crown icon
+                                    // Hero Visual: Official transparent PNG app logo in glowing golden radial circle
                                     Container(
                                       width: 48,
                                       height: 48,
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(14),
-                                        gradient: const LinearGradient(
-                                          colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
+                                        shape: BoxShape.circle,
+                                        gradient: const RadialGradient(
+                                          colors: [Color(0xFFFFD700), Color(0xFFB8860B)],
                                         ),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: const Color(0xFFFF2A6D).withOpacity(0.4),
+                                            color: const Color(0xFFFFD700).withOpacity(0.35),
                                             blurRadius: 12,
                                           ),
                                         ],
                                       ),
-                                      child: const Center(
-                                        child: Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 28),
+                                      child: Center(
+                                        child: ClipOval(
+                                          child: Image.asset(
+                                            'assets/images/app_logo.png',
+                                            width: 30,
+                                            height: 30,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) => Image.asset(
+                                              'assets/logo.png',
+                                              width: 30,
+                                              height: 30,
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 14),
-                                    // Center: Clean typography
+                                    // Center: Crisp bold title & clean subtitle
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -859,7 +922,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             'Unlimited AI memos, live widgets & couple games',
                                             style: GoogleFonts.poppins(
                                               color: Colors.white70,
-                                              fontSize: 13,
+                                              fontSize: 12.5,
                                               height: 1.25,
                                             ),
                                           ),
@@ -867,37 +930,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 10),
-                                    // Right: A pill button or chip displaying localized price tag
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
-                                        ),
-                                        borderRadius: BorderRadius.circular(20),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFFFF2A6D).withOpacity(0.4),
-                                            blurRadius: 10,
-                                            spreadRadius: 0.5,
+                                    // Right: Refined glowing golden gradient price pill
+                                    GestureDetector(
+                                      onTap: _buyMonthlyDirectly,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
                                           ),
-                                        ],
-                                      ),
-                                      child: _isPurchasing
-                                          ? const SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                            )
-                                          : Text(
-                                              _localizedPrice.contains('/mo') ? _localizedPrice : '$_localizedPrice/mo',
-                                              style: GoogleFonts.poppins(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12.5,
-                                                letterSpacing: 0.2,
-                                              ),
+                                          borderRadius: BorderRadius.circular(20),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFFFFD700).withOpacity(0.40),
+                                              blurRadius: 10,
+                                              spreadRadius: 0.5,
                                             ),
+                                          ],
+                                        ),
+                                        child: _isPurchasing
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(color: Color(0xFF1A1202), strokeWidth: 2),
+                                              )
+                                            : Text(
+                                                _localizedPrice.contains('/mo') ? _localizedPrice : '$_localizedPrice/mo',
+                                                style: GoogleFonts.poppins(
+                                                  color: const Color(0xFF1A1202),
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12.5,
+                                                  letterSpacing: 0.2,
+                                                ),
+                                              ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -939,6 +1007,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           child: Column(
                             children: [
+                              _buildSettingTile(
+                                icon: Icons.mode_edit_outline_rounded,
+                                iconColor: const Color(0xFFFF2A6D),
+                                iconBgColor: const Color(0xFFFF2A6D).withOpacity(0.15),
+                                title: 'Edit Partner Name',
+                                subtitle: appState.effectivePartnerName,
+                                onTap: () => _showEditPartnerNicknameDialog(context, appState),
+                              ),
+                              _buildDivider(),
                               _buildSettingTile(
                                 icon: Icons.notifications_rounded,
                                 iconColor: const Color(0xFFFF4D6D),

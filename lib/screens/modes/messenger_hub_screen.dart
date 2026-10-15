@@ -12,6 +12,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/app_state.dart';
+import '../../widgets/edit_nickname_dialog.dart';
 
 class MessengerHubScreen extends StatefulWidget {
   const MessengerHubScreen({super.key});
@@ -22,7 +23,6 @@ class MessengerHubScreen extends StatefulWidget {
 
 class _MessengerHubScreenState extends State<MessengerHubScreen> {
   final TextEditingController _msgController = TextEditingController();
-  bool _isGiftMode = false;
   String? _replyingTo;
   bool get _isTyping => _msgController.text.isNotEmpty;
 
@@ -152,34 +152,239 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A).withOpacity(0.9),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: StatefulBuilder(
-          builder: (context, setModalState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Chat Settings', style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: const Icon(Icons.done_all, color: Colors.blueAccent),
-                  title: Text('Read Receipts', style: GoogleFonts.poppins(color: Colors.white)),
-                  subtitle: Text('Show when messages have been seen', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
-                  trailing: Switch(
-                    value: appState.readReceiptsEnabled,
-                    activeColor: Colors.blueAccent,
-                    onChanged: (val) {
-                      setModalState(() => appState.toggleReadReceipts(val));
-                    },
+      isScrollControlled: true,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xF2161026),
+              border: Border(
+                top: BorderSide(color: const Color(0xFFFF2A6D).withOpacity(0.4), width: 1.5),
+              ),
+            ),
+            child: StatefulBuilder(
+              builder: (ctx, setModalState) {
+                return SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Chat Settings',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      // Avatar editor row
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF2A6D), Color(0xFF9B51E0)],
+                            ),
+                            border: Border.all(color: Colors.white24, width: 1),
+                          ),
+                          child: ClipOval(
+                            child: (appState.userPhotoUrl != null && appState.userPhotoUrl!.isNotEmpty)
+                                ? CachedNetworkImage(
+                                    imageUrl: appState.userPhotoUrl!,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
+                                  )
+                                : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 20),
+                          ),
+                        ),
+                        title: Text(
+                          'Your Profile Avatar',
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          'Tap to pick and update your photo',
+                          style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+                        onTap: () async {
+                          final picker = ImagePicker();
+                          final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                          if (picked != null) {
+                            await appState.updateUserAvatar(File(picked.path));
+                            setModalState(() {});
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text('Avatar updated successfully! ✨')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      const Divider(color: Colors.white12, height: 16),
+                      // Edit Partner Nickname
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFFFF2A6D).withOpacity(0.15),
+                          ),
+                          child: const Icon(Icons.edit_note_rounded, color: Color(0xFFFF2A6D), size: 22),
+                        ),
+                        title: Text(
+                          'Edit Partner Nickname',
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          appState.effectivePartnerName,
+                          style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          EditNicknameDialog.show(context, appState);
+                        },
+                      ),
+                      const Divider(color: Colors.white12, height: 16),
+                      // Chat Theme
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFF9B51E0).withOpacity(0.15),
+                          ),
+                          child: const Icon(Icons.palette_rounded, color: Color(0xFF9B51E0), size: 22),
+                        ),
+                        title: Text(
+                          'Chat Ambiance Theme',
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          appState.chatTheme?.name ?? 'Romantic Neon',
+                          style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _showThemeBottomSheet(context, appState);
+                        },
+                      ),
+                      const Divider(color: Colors.white12, height: 16),
+                      // Read Receipts
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFF00F0FF).withOpacity(0.15),
+                          ),
+                          child: const Icon(Icons.done_all_rounded, color: Color(0xFF00F0FF), size: 22),
+                        ),
+                        title: Text(
+                          'Read Receipts',
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          'Show when messages have been seen',
+                          style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
+                        ),
+                        trailing: Switch.adaptive(
+                          value: appState.readReceiptsEnabled,
+                          activeColor: const Color(0xFF00F0FF),
+                          onChanged: (val) {
+                            setModalState(() => appState.toggleReadReceipts(val));
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                   ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _isSameCalendarDay(DateTime d1, DateTime d2) {
+    return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
+  }
+
+  String _formatDateDivider(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final msgDate = DateTime(date.year, date.month, date.day);
+
+    if (msgDate == today) {
+      return 'Today';
+    } else if (msgDate == yesterday) {
+      return 'Yesterday';
+    } else if (now.year == date.year) {
+      return DateFormat('EEE, MMM d').format(date);
+    } else {
+      return DateFormat('MMM d, yyyy').format(date);
+    }
+  }
+
+  Widget _buildDateDivider(DateTime date) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withOpacity(0.12), width: 1.0),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: Text(
+                _formatDateDivider(date),
+                style: GoogleFonts.poppins(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.4,
                 ),
-              ],
-            );
-          },
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -189,7 +394,7 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final theme = appState.chatTheme ?? appState.availableThemes.first;
-    final partnerName = appState.partnerName ?? 'Partner';
+    final partnerName = appState.effectivePartnerName;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -209,7 +414,20 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
                       itemCount: appState.messages.length,
                       itemBuilder: (context, index) {
                         final msg = appState.messages[index];
-                        return Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildMessageItem(context, msg, theme, appState));
+                        final bool showDateDivider = index == appState.messages.length - 1 ||
+                            !_isSameCalendarDay(msg.timestamp, appState.messages[index + 1].timestamp);
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (showDateDivider) _buildDateDivider(msg.timestamp),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _buildMessageItem(context, msg, theme, appState),
+                            ),
+                          ],
+                        );
                       },
                     ),
                   ),
@@ -545,34 +763,41 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
         borderRadius: bubbleRadius,
         gradient: msg.isUser 
             ? const LinearGradient(
-                colors: [Color(0xFFFF2E93), Color(0xFFFF6584)],
+                colors: [Color(0xE6FF2A6D), Color(0xE69B51E0)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
             : null,
-        color: msg.isUser ? null : const Color(0x22FFFFFF),
+        color: msg.isUser ? null : Colors.white.withOpacity(0.12),
         border: Border.all(
-          color: Colors.white.withOpacity(0.18),
+          color: msg.isUser 
+              ? const Color(0xFFFF85A1).withOpacity(0.55) 
+              : Colors.white.withOpacity(0.24),
           width: 1.0,
         ),
         boxShadow: msg.isUser ? [
           BoxShadow(
-            color: const Color(0xFFFF2E93).withOpacity(0.35),
-            blurRadius: 16,
-            spreadRadius: -2,
+            color: const Color(0xFFFF2A6D).withOpacity(0.42),
+            blurRadius: 18,
+            spreadRadius: 0,
             offset: const Offset(0, 4),
-          )
+          ),
         ] : [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 12,
-          )
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.05),
+            blurRadius: 6,
+          ),
         ],
       ),
       child: ClipRRect(
         borderRadius: bubbleRadius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: msg.type == 'image' ? 6 : 16, 
@@ -606,106 +831,137 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
         padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
         child: RepaintBoundary(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(28),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: theme.backgroundColors.first.withOpacity(0.4),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20)],
+                  color: Colors.white.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.18),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    // Media Button on far left
                     _isUploadingMedia
-                      ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2)))
-                      : _buildInputIcon(Icons.add_photo_alternate_rounded, () async {
-                          final picker = ImagePicker();
-                          final xFile = await picker.pickImage(source: ImageSource.gallery);
-                          if (xFile != null) {
-                            setState(() => _isUploadingMedia = true);
-                            final url = await appState.uploadImage(File(xFile.path));
-                            setState(() => _isUploadingMedia = false);
-                            if (url != null) {
-                              appState.addMessage(ChatMessage(
-                                id: DateTime.now().toString(), text: '', isUser: true, type: 'image', imageUrl: url,
-                              ));
-                            }
-                          }
-                        }, color: Colors.white70, size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.2), 
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: _isGiftMode ? const Color(0xFFFFD700).withOpacity(0.5) : Colors.white.withOpacity(0.05), 
-                            width: 1.5
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _msgController,
-                                style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-                                maxLines: 4,
-                                minLines: 1,
-                                decoration: InputDecoration(
-                                  hintText: _isGiftMode ? 'Write a secret gift note...' : 'Message...',
-                                  hintStyle: GoogleFonts.poppins(color: _isGiftMode ? const Color(0xFFFFD700).withOpacity(0.6) : Colors.white38, fontSize: 15),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                                ),
-                              ),
+                        ? const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(color: Colors.white70, strokeWidth: 2),
                             ),
-                            const SizedBox(width: 8),
-                            _buildInputIcon(Icons.card_giftcard, () {
-                              setState(() => _isGiftMode = !_isGiftMode);
-                              HapticFeedback.lightImpact();
-                            }, color: _isGiftMode ? const Color(0xFFFFD700) : Colors.white54),
-                          ],
+                          )
+                        : _buildInputIcon(
+                            Icons.add_photo_alternate_rounded,
+                            () async {
+                              final picker = ImagePicker();
+                              final xFile = await picker.pickImage(source: ImageSource.gallery);
+                              if (xFile != null) {
+                                setState(() => _isUploadingMedia = true);
+                                final url = await appState.uploadImage(File(xFile.path));
+                                setState(() => _isUploadingMedia = false);
+                                if (url != null) {
+                                  appState.addMessage(ChatMessage(
+                                    id: DateTime.now().toString(),
+                                    text: '',
+                                    isUser: true,
+                                    type: 'image',
+                                    imageUrl: url,
+                                  ));
+                                }
+                              }
+                            },
+                            color: Colors.white70,
+                            size: 24,
+                          ),
+                    const SizedBox(width: 8),
+
+                    // Expanded Spacious Text Field
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 4, top: 4),
+                        child: TextField(
+                          controller: _msgController,
+                          style: GoogleFonts.poppins(color: Colors.white, fontSize: 14.5),
+                          maxLines: 4,
+                          minLines: 1,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: InputDecoration(
+                            hintText: 'Type a sweet message...',
+                            hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 14.5),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+
+                    // Glowing Send Button on far right
                     GestureDetector(
                       onTap: () {
-                        if (_msgController.text.isNotEmpty) {
+                        if (_msgController.text.trim().isNotEmpty) {
                           appState.addMessage(ChatMessage(
-                            id: DateTime.now().toString(), text: _msgController.text, isUser: true, 
-                            type: _isGiftMode ? 'gift' : 'text', replyingToText: _replyingTo
+                            id: DateTime.now().toString(),
+                            text: _msgController.text.trim(),
+                            isUser: true,
+                            type: 'text',
+                            replyingToText: _replyingTo,
                           ));
                           _msgController.clear();
-                          setState(() { _replyingTo = null; _isGiftMode = false; });
+                          setState(() {
+                            _replyingTo = null;
+                          });
                         }
                       },
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 4),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: _isGiftMode 
-                                ? [const Color(0xFFFFD700), const Color(0xFFFFA500)] 
-                                : (_isTyping ? [theme.accentColor, theme.userShadowColor] : [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)])
-                            ),
-                            boxShadow: _isTyping ? [
-                              BoxShadow(
-                                color: _isGiftMode ? const Color(0xFFFFD700).withOpacity(0.4) : theme.userShadowColor.withOpacity(0.4), 
-                                blurRadius: 12, spreadRadius: 2
-                              )
-                            ] : [],
+                            gradient: _isTyping
+                                ? const LinearGradient(
+                                    colors: [Color(0xFFFF2A6D), Color(0xFFFF7597)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : LinearGradient(
+                                    colors: [
+                                      Colors.white.withOpacity(0.12),
+                                      Colors.white.withOpacity(0.06),
+                                    ],
+                                  ),
+                            boxShadow: _isTyping
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFFFF2A6D).withOpacity(0.55),
+                                      blurRadius: 14,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : [],
                           ),
-                          child: Icon(Icons.send_rounded, color: _isTyping ? Colors.white : Colors.white38, size: 20),
+                          child: Icon(
+                            Icons.send_rounded,
+                            color: _isTyping ? Colors.white : Colors.white38,
+                            size: 19,
+                          ),
                         ),
                       ),
                     ),
@@ -721,12 +977,15 @@ class _MessengerHubScreenState extends State<MessengerHubScreen> {
 
   Widget _buildInputIcon(IconData icon, VoidCallback onTap, {Color color = Colors.white, double size = 24}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 4.0),
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            shape: BoxShape.circle,
+          ),
           child: Icon(icon, color: color, size: size),
         ),
       ),

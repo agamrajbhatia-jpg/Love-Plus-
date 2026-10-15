@@ -87,8 +87,17 @@ class AppState extends ChangeNotifier {
   bool isLinked = false;
   String? userName;
   String? partnerName;
+  String? customPartnerNickname;
+  String? userPhotoUrl;
   String? connectionCode;
   String? userRole; // "BF" or "GF"
+
+  String get effectivePartnerName {
+    if (customPartnerNickname != null && customPartnerNickname!.trim().isNotEmpty) {
+      return customPartnerNickname!.trim();
+    }
+    return partnerName ?? 'Partner';
+  }
   
   String? userOotdImage;
   String? partnerOotdImage;
@@ -164,6 +173,7 @@ class AppState extends ChangeNotifier {
   }
 
   void syncUserFromFirestore(String uid, Map<String, dynamic> data) {
+    NotificationService.syncFCMToken(uid);
     bool changed = false;
     if (currentUid != uid) {
       currentUid = uid;
@@ -172,6 +182,11 @@ class AppState extends ChangeNotifier {
     
     if (userName != data['name']) {
       userName = data['name'];
+      changed = true;
+    }
+    final String? photo = data['photoUrl'] ?? data['profileImageUrl'];
+    if (photo != userPhotoUrl) {
+      userPhotoUrl = photo;
       changed = true;
     }
     if (userRole != data['role']) {
@@ -188,6 +203,15 @@ class AppState extends ChangeNotifier {
       readReceiptsEnabled = newReadReceipts;
       changed = true;
     }
+
+    // Load local cached nickname for partner
+    SharedPreferences.getInstance().then((prefs) {
+      final cachedNick = prefs.getString('custom_partner_nickname_$uid');
+      if (cachedNick != null && cachedNick.isNotEmpty && cachedNick != customPartnerNickname) {
+        customPartnerNickname = cachedNick;
+        notifyListeners();
+      }
+    });
     
     final coupleId = data['coupleId'];
     if (coupleId != null && coupleId != currentCoupleId) {
@@ -219,7 +243,7 @@ class AppState extends ChangeNotifier {
     _partnerUserSub = FirebaseFirestore.instance.collection('users').doc(pUid).snapshots().listen((doc) {
       if (doc.exists) {
         final data = doc.data();
-        final String? newPhoto = data?['photoUrl'] ?? data?['profileImageUrl'];
+        final String? newPhoto = data?['photoUrl'] ?? data?['profileImageUrl'] ?? data?['avatarUrl'];
         final String? newName = data?['name'];
         bool changed = false;
         if (newPhoto != partnerPhotoUrl) {
@@ -240,11 +264,35 @@ class AppState extends ChangeNotifier {
     _coupleSub = FirebaseFirestore.instance.collection('couples').doc(coupleId).snapshots().listen((snapshot) {
       if (snapshot.exists) {
         final data = snapshot.data()!;
-        final pUid = currentUid == data['user1'] ? data['user2'] : data['user1'];
-        if (pUid != partnerUid) {
-          partnerUid = pUid;
-          _listenToPartnerUser(pUid);
+        var pUid = currentUid == data['user1'] ? data['user2'] : data['user1'];
+        if ((pUid == null || pUid.toString().isEmpty) && coupleId.contains('_')) {
+          pUid = coupleId.split('_').firstWhere((id) => id != currentUid, orElse: () => '');
         }
+
+        if (pUid != null && pUid.toString().isNotEmpty && pUid != partnerUid) {
+          partnerUid = pUid.toString();
+          _listenToPartnerUser(partnerUid);
+        }
+
+        // Custom Partner Nickname sync from Firestore
+        if (data['partnerNicknames'] != null && data['partnerNicknames'] is Map && currentUid != null) {
+          final nicknamesMap = data['partnerNicknames'] as Map<String, dynamic>;
+          final myNickForPartner = nicknamesMap[currentUid];
+          if (myNickForPartner != null && myNickForPartner is String && myNickForPartner != customPartnerNickname) {
+            customPartnerNickname = myNickForPartner;
+            notifyListeners();
+          }
+        }
+
+        // Chat Theme sync from Firestore
+        final themeId = data['chatThemeId'];
+        if (themeId != null && themeId is String && themeId != chatTheme?.id) {
+          try {
+            chatTheme = availableThemes.firstWhere((t) => t.id == themeId);
+            notifyListeners();
+          } catch (_) {}
+        }
+
         final newIsTyping = data['typing_$pUid'] ?? false;
         
         if (isPartnerTyping != newIsTyping) {
@@ -464,12 +512,92 @@ class AppState extends ChangeNotifier {
 
   ChatTheme? chatTheme;
 
+  Future<void> updatePartnerNickname(String newNickname) async {
+    final trimmed = newNickname.trim();
+    customPartnerNickname = trimmed.isEmpty ? null : trimmed;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (currentUid != null) {
+        if (customPartnerNickname != null) {
+          await prefs.setString('custom_partner_nickname_$currentUid', customPartnerNickname!);
+        } else {
+          await prefs.remove('custom_partner_nickname_$currentUid');
+        }
+      }
+
+      if (currentCoupleId != null && currentUid != null) {
+        await FirebaseFirestore.instance.collection('couples').doc(currentCoupleId).set({
+          'partnerNicknames': {
+            currentUid!: customPartnerNickname,
+          }
+        }, SetOptions(merge: true));
+
+        await FirebaseFirestore.instance
+            .collection('couples')
+            .doc(currentCoupleId)
+            .collection('partnerNicknames')
+            .doc(currentUid!)
+            .set({
+          'nickname': customPartnerNickname,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (customPartnerNickname != null) {
+          NotificationService.dispatchPushNotification(
+            coupleId: currentCoupleId,
+            partnerUid: partnerUid,
+            title: '✏️ New Partner Nickname',
+            body: '${(userName != null && userName!.isNotEmpty) ? userName! : "Your partner"} set your nickname to "$customPartnerNickname"',
+            type: 'chat',
+            chatId: currentCoupleId,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("Error updating partner nickname: $e");
+    }
+  }
+
+  Future<void> updateUserAvatar(File imageFile) async {
+    if (currentUid == null) return;
+    try {
+      final storageRef = FirebaseStorage.instance.ref().child('profile_pictures/$currentUid');
+      await storageRef.putFile(imageFile);
+      final downloadUrl = await storageRef.getDownloadURL();
+      await FirebaseFirestore.instance.collection('users').doc(currentUid).update({
+        'photoUrl': downloadUrl,
+      });
+      userPhotoUrl = downloadUrl;
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error updating avatar: $e");
+      rethrow;
+    }
+  }
+
   void setChatTheme(ChatTheme? theme) async {
     chatTheme = theme;
     notifyListeners();
     if (theme != null) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('chatThemeId', theme.id);
+
+      if (currentCoupleId != null) {
+        await FirebaseFirestore.instance.collection('couples').doc(currentCoupleId).set({
+          'chatThemeId': theme.id,
+        }, SetOptions(merge: true));
+
+        NotificationService.dispatchPushNotification(
+          coupleId: currentCoupleId,
+          partnerUid: partnerUid,
+          title: '🎨 New Chat Theme',
+          body: '${(userName != null && userName!.isNotEmpty) ? userName! : "Your partner"} changed the ambiance to ${theme.name} ${theme.emoji}',
+          type: 'theme',
+          chatId: currentCoupleId,
+        );
+      }
     }
   }
 

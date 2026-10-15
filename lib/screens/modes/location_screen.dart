@@ -61,7 +61,7 @@ class _LocationScreenState extends State<LocationScreen> {
       _initLocationStream();
       final appState = context.read<AppState>();
       if (appState.currentUid != null) {
-        _loadCustomMarkers(appState.currentUid, appState.currentCoupleId != null ? appState.partnerName : null);
+        _loadCustomMarkers(appState.currentUid, appState.partnerUid);
       }
     });
   }
@@ -505,7 +505,7 @@ class _LocationScreenState extends State<LocationScreen> {
       });
 
       _myPhotoUrlCache = null; 
-      await _loadCustomMarkers(uid, appState.currentCoupleId != null ? appState.partnerName : null);
+      await _loadCustomMarkers(uid, appState.partnerUid);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

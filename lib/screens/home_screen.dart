@@ -17,6 +17,7 @@ import '../widgets/bouncing_button.dart';
 import 'modes/game_zone_screen.dart';
 import '../services/premium_gate_service.dart';
 import '../widgets/feature_walkthrough_modal.dart';
+import '../widgets/edit_nickname_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,8 +41,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkWalkthroughStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final hasSeen = prefs.getBool('has_seen_walkthrough') ?? false;
-      if (!hasSeen && mounted) {
+      final hasCompleted = (prefs.getBool('has_completed_walkthrough') ?? false) ||
+          (prefs.getBool('has_seen_walkthrough') ?? false);
+      if (!hasCompleted && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) FeatureWalkthroughModal.show(context);
         });
@@ -67,7 +69,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final partnerName = context.watch<AppState>().partnerName ?? "Your Partner";
+    final appState = context.watch<AppState>();
+    final partnerName = appState.effectivePartnerName;
     final bool hideNav = isNavCollapsed && _currentIndex == 4;
 
     return Scaffold(
@@ -75,9 +78,29 @@ class _HomeScreenState extends State<HomeScreen> {
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(
-          'You & $partnerName',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
+        title: GestureDetector(
+          onTap: () => EditNicknameDialog.show(context, appState),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'You & $partnerName',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.edit_rounded, color: Colors.white, size: 13),
+              ),
+            ],
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,

@@ -74,16 +74,18 @@ exports.onNewMessage = functions.firestore
         title: title,
         body: body,
         sound: 'default',
+        channelId: 'loveplus_high_importance_channel',
       },
       data: {
         type: msgType,
         chatId: coupleId,
         senderId: actualSenderId,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
       },
       android: {
         priority: 'high',
         notification: {
-          channelId: 'loveplus_alerts',
+          channelId: 'loveplus_high_importance_channel',
           sound: 'default',
         }
       }
@@ -135,16 +137,18 @@ exports.onNewOotd = functions.firestore
         title: '👕 New Outfit of the Day!',
         body: `${senderName} just posted their OOTD. Tap to check it out!`,
         sound: 'default',
+        channelId: 'loveplus_high_importance_channel',
       },
       data: {
         type: 'ootd',
         chatId: coupleId,
         senderId: senderId,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
       },
       android: {
         priority: 'high',
         notification: {
-          channelId: 'loveplus_alerts',
+          channelId: 'loveplus_high_importance_channel',
           sound: 'default',
         }
       }
@@ -169,16 +173,18 @@ exports.onNotificationQueue = functions.firestore
         title: data.notification?.title || data.title || 'Love Plus Alert',
         body: data.notification?.body || data.body || '',
         sound: 'default',
+        channelId: 'loveplus_high_importance_channel',
       },
       data: {
         type: String(data.data?.type || data.type || 'chat'),
         chatId: String(data.data?.chatId || data.coupleId || ''),
         senderId: String(data.data?.senderId || data.senderId || ''),
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
       },
       android: {
         priority: 'high',
         notification: {
-          channelId: 'loveplus_alerts',
+          channelId: 'loveplus_high_importance_channel',
           sound: 'default',
         }
       }

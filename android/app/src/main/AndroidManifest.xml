@@ -16,7 +16,7 @@
         <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyAaOOqMc-olUujNMiZqCXeLlE6GX8ovfhk"/>
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="loveplus_alerts" />
+            android:value="loveplus_high_importance_channel" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/launcher_icon" />

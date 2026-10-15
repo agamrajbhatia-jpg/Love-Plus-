@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -39,17 +38,33 @@ class _CustomDeckCreatorScreenState extends State<CustomDeckCreatorScreen> {
       if (coupleId != null && uid != null) {
         final questions = _controllers.map((c) => c.text.trim()).toList();
 
-        await FirebaseFirestore.instance
-            .collection('couples')
-            .doc(coupleId)
-            .collection('custom_decks')
-            .add({
-          'templateType': widget.templateType,
+        String? targetUserId = appState.partnerUid;
+        if ((targetUserId == null || targetUserId.isEmpty) && coupleId.contains('_')) {
+          targetUserId = coupleId.split('_').firstWhere((id) => id != uid, orElse: () => '');
+        }
+
+        final docRef = FirebaseFirestore.instance.collection('couples').doc(coupleId).collection('custom_games').doc();
+        final gamePayload = {
+          'id': docRef.id,
+          'creatorId': uid,
+          'targetUserId': targetUserId ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+          'type': widget.templateType.toLowerCase().contains('quiz') ? 'quiz' : 'couple_card',
+          'status': 'pending',
+          'title': widget.templateType,
           'questions': questions,
-          'createdBy': uid,
-          'timestamp': FieldValue.serverTimestamp(),
-          'isPlayed': false,
-        });
+        };
+        await docRef.set(gamePayload);
+
+        try {
+          await FirebaseFirestore.instance.collection('couples').doc(coupleId).collection('custom_decks').doc(docRef.id).set({
+            ...gamePayload,
+            'templateType': widget.templateType,
+            'createdBy': uid,
+            'timestamp': FieldValue.serverTimestamp(),
+            'isPlayed': false,
+          });
+        } catch (_) {}
 
         await FirebaseGateService.recordCustomCreation(coupleId, uid);
 

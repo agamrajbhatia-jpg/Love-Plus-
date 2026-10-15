@@ -48,27 +48,27 @@ class _FeatureWalkthroughModalState extends State<FeatureWalkthroughModal> {
       'badge': 'RADAR',
     },
     {
-      'title': 'Love Letters & Memos',
+      'title': 'OOTD & Daily Fits',
       'description':
-          'Drop daily handwritten thoughts, photo memos, and secret notes directly onto each other\'s home spaces.',
-      'icon': Icons.mark_email_read_rounded,
+          'Share your daily style and fit checks privately with instant notifications, glowing borders, and cute hype reactions.',
+      'icon': Icons.checkroom_rounded,
+      'gradient': [const Color(0xFFFF2A6D), const Color(0xFF9B51E0)],
+      'badge': 'DAILY FITS',
+    },
+    {
+      'title': 'Love Letters & Board',
+      'description':
+          'Pin heartfelt love letters, secret memos, and memories on your shared board to cherish anytime.',
+      'icon': Icons.favorite_rounded,
       'gradient': [const Color(0xFFFF2A6D), const Color(0xFFFF8E53)],
-      'badge': 'MEMOS',
+      'badge': 'LOVE BOARD',
     },
     {
-      'title': 'OOTD & Daily Snap',
+      'title': 'Deep Conversation Decks',
       'description':
-          'Share your daily style and moments privately with instant notifications and cute reactions.',
-      'icon': Icons.camera_alt_rounded,
-      'gradient': [const Color(0xFFFF2A6D), const Color(0xFF00F0FF)],
-      'badge': 'DAILY SNAP',
-    },
-    {
-      'title': 'Deep Dive Couple Decks',
-      'description':
-          'Unpack conversation card decks and spicy couple questions designed to bring you closer every night.',
+          'Explore intimate questions, fun challenges, and spicy couple card decks crafted to spark deep conversations.',
       'icon': Icons.auto_awesome_rounded,
-      'gradient': [const Color(0xFF9B51E0), const Color(0xFFFF2A6D)],
+      'gradient': [const Color(0xFF9B51E0), const Color(0xFF00F0FF)],
       'badge': 'GAMES & DECKS',
     },
   ];
@@ -76,6 +76,7 @@ class _FeatureWalkthroughModalState extends State<FeatureWalkthroughModal> {
   Future<void> _completeWalkthrough() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_completed_walkthrough', true);
       await prefs.setBool('has_seen_walkthrough', true);
     } catch (_) {}
     if (mounted) {
